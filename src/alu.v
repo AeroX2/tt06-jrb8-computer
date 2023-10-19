@@ -9,12 +9,12 @@ module alu(
 	output overout,
 	output cmpo
 );
-	reg [7:0] mem [0:7];
+	reg [7:0] alu_rom [0:7];
 	initial begin
-		$readmemh("alu_rom", mem);
+		$readmemh("alu_rom.mem", alu_rom);
 	end
 	
-	wire [7:0] val = mem[cins];
+	wire [7:0] val = alu_rom[cins];
 	
 	assign za = val[0];
 	assign ia = val[1];

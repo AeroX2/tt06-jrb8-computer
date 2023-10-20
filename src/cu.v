@@ -3,8 +3,8 @@ module cu(
 	input iri_in,
 	input clk,
 	input reset,
-	output [4:0] inflag,
-	output [3:0] outflag,
+	output [4:0] inflags,
+	output [3:0] outflags,
 	output pcc,
 	output iri_out,
 	output cuout
@@ -21,8 +21,8 @@ module cu(
 	begin
 		if (reset)
 			ir_reg <= 1'b0;
-		else if (clk)
-			ir_reg <= iri_in & irin;
+		else if (clk && iri_in)
+			ir_reg <= irin;
 	end
 	assign cuout = ir_reg;
 
@@ -37,11 +37,11 @@ module cu(
 
 	assign iri_out = cuctr[0];
 
-	assign val = cu_rom[ir_reg];
-	assign val2 = cu_rom_2[ir_reg];
+	wire [7:0] val = cu_rom[ir_reg];
+	wire [7:0] val2 = cu_rom_2[ir_reg];
 
 	wire [7:0] fin = (val & cuctr[1]) | (val2 & cuctr[2]);
-	assign inflag = fin[3:0];
-	assign outflag = fin[6:4];
+	assign inflags = fin[3:0];
+	assign outflags = fin[6:4];
 	assign pcc = iri_out | fin[7];
 endmodule

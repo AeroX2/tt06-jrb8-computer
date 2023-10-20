@@ -9,8 +9,8 @@ module cu(
 	output iri_out,
 	output cuout
 );
-	reg [7:0] cu_rom [0:7];
-	reg [7:0] cu_rom_2 [0:7];
+	reg [7:0] cu_rom [0:255];
+	reg [7:0] cu_rom_2 [0:255];
 	initial begin
 		$readmemh("cu_rom.mem", cu_rom);
 		$readmemh("cu_rom_2.mem", cu_rom_2);

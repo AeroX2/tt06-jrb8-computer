@@ -10,7 +10,10 @@ for line in f[1:]:
         else:
             q = int(g, 16)
             j.append(q)
-y = (' '.join([hex(x)[2:] for x in j]))
+
+o = [hex(x)[2:] for x in j]
+po = o + ['0'] * (256-len(o))
+y = (' '.join(po))
 f2 = open(sys.argv[1]+'.mem', 'w')
 f2.write(y)
 f2.close()

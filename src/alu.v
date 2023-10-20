@@ -1,15 +1,15 @@
 module alu(
-	input [7:0] a,
-	input [7:0] b,
+	input signed [7:0] a,
+	input signed [7:0] b,
 	input [7:0] cins,
 	input oe,
 	input carryin,
 	output carryout,
-	output aluout,
+	output signed [7:0] aluout,
 	output overout,
 	output cmpo
 );
-	reg [7:0] alu_rom [0:7];
+	reg [8:0] alu_rom [0:255];
 	initial begin
 		$readmemh("alu_rom.mem", alu_rom);
 	end
@@ -25,30 +25,30 @@ module alu(
 	// wire cselect = val[7:6];
 	assign cmpo = oe & val[8];
 	
-	wire aandz = a & (~za);
-	wire bandz = b & (~zb);
+	wire [7:0] aandz = za ? 0 : a;
+	wire [7:0] bandz = zb ? 0 : b;
 	
-	wire xora = aandz ^ ia;
-	wire xorb = bandz ^ ib;
+	wire signed [7:0] xora = aandz ^ {8{ia}};
+	wire signed [7:0] xorb = bandz ^ {8{ib}};
 	
 	wire carried = carry & carryin;
 	
-	wire [8:0] sum = xora + xorb + carried;
-	wire [7:0] added = sum[7:0];
+	wire signed [8:0] sum = xora + xorb + carried;
+	wire signed [7:0] added = sum[7:0];
 	assign carryout = sum[8];
 	
-	wire anded = xora & xorb;
+	wire [7:0] anded = xora & xorb;
 	
-	wire shiftr = xora >> xorb;
-	wire shiftl = xora << xorb;
+	wire [7:0] shiftr = xora >> xorb;
+	wire [7:0] shiftl = xora << xorb;
 	
 	wire ml = val[6];
 	wire mh = val[7];
 	
-	wire muxoutput = mh ? (ml ? shiftl : shiftr) : (ml ? anded : added);
+	wire [7:0] muxoutput = mh ? (ml ? shiftl : shiftr) : (ml ? anded : added);
 		
-	wire [7:0] out1 = added ^ io;
-	assign aluout = oe & out1;
+	wire [7:0] out1 = added ^ {8{io}};
+	assign aluout = oe ? out1 : 0;
 	
 	assign overout = ((~out1[7]) & a[7] & b[7]) | (out1[7] & ~a[7] & ~b[7]);
 endmodule

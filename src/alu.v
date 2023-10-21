@@ -47,7 +47,7 @@ module alu(
 	
 	wire [7:0] muxoutput = mh ? (ml ? shiftl : shiftr) : (ml ? anded : added);
 		
-	wire [7:0] out1 = added ^ {8{io}};
+	wire [7:0] out1 = muxoutput ^ {8{io}};
 	assign aluout = oe ? out1 : 0;
 	
 	assign overout = ((~out1[7]) & a[7] & b[7]) | (out1[7] & ~a[7] & ~b[7]);

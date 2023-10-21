@@ -111,4 +111,20 @@ module tt_um_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.cmpo(cmpo)
 	);
 
+	wire zflag;
+	wire oflag;
+	wire cflag;
+	wire sflag;
+	cmp cmp(
+		.cmpin(databus),
+		.overflow(overout),
+		.carry(carryout),
+		.clk(clk),
+		.reset(rst),
+		.zflag(zflag),
+		.oflag(oflag),
+		.cflag(cflag),
+		.sflag(sflag)
+	);
+
 endmodule

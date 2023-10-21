@@ -1,16 +1,15 @@
 module cmp(
 	input [7:0] cmpin,
-	input oe,
+	input we,
 	input overflow,
 	input carry,
 	input clk,
-	input reset
+	input reset,
+	output reg zflag,
+	output reg oflag,
+	output reg cflag,
+	output reg sflag
 );
-	reg zflag;
-	reg oflag;
-	reg cflag;
-	reg sflag;
-
 	always @(posedge clk, posedge reset)
 	begin
 		if (reset) begin
@@ -19,11 +18,11 @@ module cmp(
 			cflag <= 0;
 			sflag <= 0;
 		end
-		else if (clk) begin
-			zflag <= (oe & cmpin[6:0]);
-			oflag <= (oe & overflow);
-			cflag <= (oe & carry);
-			sflag <= (oe & cmpin[7]);
+		else if (we) begin
+			zflag <= cmpin[6:0] == 0;
+			oflag <= overflow;
+			cflag <= carry;
+			sflag <= cmpin[7];
 		end
 	end
 endmodule

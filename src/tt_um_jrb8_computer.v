@@ -130,8 +130,8 @@ module tt_um_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	);
   
 	jmp jmp(
-		.jmpins(cins),
-		.pcin(pcin),
+		.cins(cins),
+		.pcin(pc),
 		.databus(databus),
 		.clk(clk),
 		.reset(rst),

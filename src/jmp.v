@@ -1,7 +1,7 @@
 module jmp(
-	input [7:0] jmpins,
+	input [7:0] cins,
 	input [7:0] databus,
-	input [7:0] pcin,
+	input [15:0] pcin,
 	input clk,
 	input reset,
 	input zflag,
@@ -17,7 +17,7 @@ module jmp(
 		$readmemh("jmp_rom.mem", jmp_rom);
 	end
 
-	wire [4:0] val = jmp_rom[jmpins];
+	wire [4:0] val = jmp_rom[cins];
 
 	wire eq = zflag;
 	wire neq = !zflag;
@@ -30,23 +30,24 @@ module jmp(
 	wire slg = !(oflag ^ sflag);
 	wire slge = (oflag ^ sflag) | !zflag;
 
-	wire [10:0] flags = {1'b1, eq, neq, ls, leq, lg, lge, sls, sleq, slg, slge};
+	wire [10:0] flags = {slge, slg, sleq, sls, lge, lg, leq, ls, neq, eq, 1'b1};
 	wire [3:0] sel = val[3:0];
 
-	assign pcoe = flags[sel] & oe;
+	wire test = flags[sel];
+	assign pcoe = test & oe;
 
 	reg [7:0] highbits;
 	always @(posedge clk, posedge reset)
 	begin
 		if (reset)
-			highbits <= 1'b0;
+			highbits <= 8'b0;
 		else if (clk)
 			highbits <= databus;
 	end
 
-	wire [15:0] two_byte_address = {databus, highbits}; 
+	wire [15:0] two_byte_address = {highbits, databus}; 
 	wire [15:0] pcadd = pcin + two_byte_address;
 
-	wire [15:0] muxoutput = val[4] ? two_byte_address : pcadd;
-	assign pcout = pcoe & muxoutput;
+	wire [15:0] muxoutput = val[4] ? pcadd : two_byte_address;
+	assign pcout = pcoe ? muxoutput : 16'b0;
 endmodule

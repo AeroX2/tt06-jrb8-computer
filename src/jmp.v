@@ -4,36 +4,36 @@ module jmp(
 	input [7:0] pcin,
 	input clk,
 	input reset,
-	input zin,
-	input oin,
-	input cin,
-	input sin,
+	input zflag,
+	input oflag,
+	input cflag,
+	input sflag,
 	input oe,
 	output pcoe,
-	output [7:0] pcout
+	output [15:0] pcout
 );
-	reg [7:0] jmp_rom [0:7];
+	reg [4:0] jmp_rom [0:255];
 	initial begin
 		$readmemh("jmp_rom.mem", jmp_rom);
 	end
 
 	wire [4:0] val = jmp_rom[jmpins];
 
-	assign eq = zin;
-	assign neq = !zin;
-	assign ls = cin;
-	assign leq = cin | zin;
-	assign lg = !(cin | zin);
-	assign lge = !cin;
-	assign sls = oin ^ sin;
-	assign sleq = (oin ^ sin) | zin;
-	assign slg = !(oin ^ sin);
-	assign slge = (oin ^ sin) | !zin;
+	wire eq = zflag;
+	wire neq = !zflag;
+	wire ls = cflag;
+	wire leq = cflag | zflag;
+	wire lg = !(cflag | zflag);
+	wire lge = !cflag;
+	wire sls = oflag ^ sflag;
+	wire sleq = (oflag ^ sflag) | zflag;
+	wire slg = !(oflag ^ sflag);
+	wire slge = (oflag ^ sflag) | !zflag;
 
 	wire [10:0] flags = {1'b1, eq, neq, ls, leq, lg, lge, sls, sleq, slg, slge};
 	wire [3:0] sel = val[3:0];
 
-	assign pcoe = sel[flags] & oe;
+	assign pcoe = flags[sel] & oe;
 
 	reg [7:0] highbits;
 	always @(posedge clk, posedge reset)
@@ -44,9 +44,9 @@ module jmp(
 			highbits <= databus;
 	end
 
-	assign two_byte_address = {databus, highbits}; 
-	assign pcadd = pcin + two_byte_address;
+	wire [15:0] two_byte_address = {databus, highbits}; 
+	wire [15:0] pcadd = pcin + two_byte_address;
 
-	assign muxoutput = val[4] ? two_byte_address : pcadd;
+	wire [15:0] muxoutput = val[4] ? two_byte_address : pcadd;
 	assign pcout = pcoe & muxoutput;
 endmodule

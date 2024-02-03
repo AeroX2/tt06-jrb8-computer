@@ -7,7 +7,7 @@ module cu(
 	output [3:0] outflags,
 	output pcc,
 	output iri_out,
-	output cuout
+	output [7:0] cuout
 );
 	reg [7:0] cu_rom [0:255];
 	reg [7:0] cu_rom_2 [0:255];

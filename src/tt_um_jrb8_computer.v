@@ -11,9 +11,6 @@ module tt_um_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
     input  wire       rst_n     // reset_n - low to reset
 );
 	wire rst = !rst_n;
-    // instantiate segment display
-    // seg7 seg7(.counter(digit), .segments(led_out));
-	//
 	wire [7:0] databus;	
 
 
@@ -62,16 +59,21 @@ module tt_um_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		end
 	end
 
-	reg [7:0] pc_low;
-	reg [7:0] pc_high;
+    wire pcinflag;
+    wire [15:0] pcin;
+	reg [15:0] pc;
+
 
 	always @(posedge clk, posedge rst_n)
 	begin
 		if (rst_n) begin
-			pc_low <= 0;
-			pc_high <= 0;
+			pc <= 0;
 		end else if (clk) begin
-			pc_low = pc_low + 1;
+			if (pcinflag) begin
+				pc = pcin;
+			end else begin
+				pc = pc + 1;
+			end
 		end
 	end
 
@@ -92,7 +94,7 @@ module tt_um_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.iri_out(iri)
 	);
 
-	wire c_or_d_reg = doo ? creg : dreg;
+	wire [7:0] c_or_d_reg = doo ? creg : dreg;
 
 	wire aluo = ao | co | doo;
 
@@ -102,7 +104,7 @@ module tt_um_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	alu alu(
 		.a(areg),
 		.b(c_or_d_reg),
-		.carryin(1),
+		.carryin(cflag),
 		.oe(aluo),
 		.cins(cins),
 		.aluout(databus),
@@ -125,6 +127,20 @@ module tt_um_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.oflag(oflag),
 		.cflag(cflag),
 		.sflag(sflag)
+	);
+  
+	jmp jmp(
+		.jmpins(cins),
+		.pcin(pcin),
+		.databus(databus),
+		.clk(clk),
+		.reset(rst),
+		.zflag(zflag),
+		.oflag(oflag),
+		.cflag(cflag),
+		.sflag(sflag),
+		.pcoe(pcinflag),
+		.pcout(pcin)
 	);
 
 endmodule

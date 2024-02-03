@@ -3,6 +3,7 @@ import random
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, FallingEdge, Timer, ClockCycles
 
+
 def setup(dut):
     alu = dut.tt_um_jrb8_computer.alu
 
@@ -28,6 +29,7 @@ async def test_alu_sanity(dut):
 
     assert alu.aluout.value.signed_integer == 0
 
+
 @cocotb.test()
 async def test_alu_consts(dut):
     alu, a, b = setup(dut)
@@ -44,10 +46,11 @@ async def test_alu_consts(dut):
     await Timer(1)
     assert alu.aluout.value.signed_integer == -1
 
+
 @cocotb.test()
 async def test_alu_simple(dut):
     alu, a, b = setup(dut)
-    
+
     alu.cins.value = 0x53
     await Timer(1)
     assert alu.aluout.value.signed_integer == a
@@ -64,6 +67,7 @@ async def test_alu_simple(dut):
     await Timer(1)
     assert alu.aluout.value.signed_integer == ~b
 
+
 @cocotb.test()
 async def test_alu_additions(dut):
     alu, a, b = setup(dut)
@@ -78,58 +82,60 @@ async def test_alu_additions(dut):
 
     alu.cins.value = 0x59
     await Timer(1)
-    assert alu.aluout.value.signed_integer == a+1
+    assert alu.aluout.value.signed_integer == a + 1
 
-    alu.cins.value = 0x5a
+    alu.cins.value = 0x5A
     await Timer(1)
-    assert alu.aluout.value.signed_integer == b+1
+    assert alu.aluout.value.signed_integer == b + 1
 
-    alu.cins.value = 0x5b
+    alu.cins.value = 0x5B
     await Timer(1)
-    assert alu.aluout.value.signed_integer == a-1
+    assert alu.aluout.value.signed_integer == a - 1
 
-    alu.cins.value = 0x5c
+    alu.cins.value = 0x5C
     await Timer(1)
-    assert alu.aluout.value.signed_integer == b-1
+    assert alu.aluout.value.signed_integer == b - 1
+
 
 def gen_rand(cond):
     test = True
-    while (test):
+    while test:
         a = random.randint(-127, 127)
         b = random.randint(-127, 127)
-        if (cond(a,b)):
+        if cond(a, b):
             test = False
-    return a,b
+    return a, b
+
 
 @cocotb.test()
 async def test_alu_additions_2(dut):
     alu, a, b = setup(dut)
 
     # Test without overflow
-    a, b = gen_rand(lambda a,b: a+b > -127 and a+b < 127) 
+    a, b = gen_rand(lambda a, b: a + b > -127 and a + b < 127)
 
     alu.a.value = a
     alu.b.value = b
 
-    alu.cins.value = 0x5d
+    alu.cins.value = 0x5D
     await Timer(1)
-    assert alu.aluout.value.signed_integer == a+b
+    assert alu.aluout.value.signed_integer == a + b
 
-    a, b = gen_rand(lambda a,b: a-b > -127 and a-b < 127) 
+    a, b = gen_rand(lambda a, b: a - b > -127 and a - b < 127)
     alu.a.value = a
     alu.b.value = b
 
-    alu.cins.value = 0x5e
+    alu.cins.value = 0x5E
     await Timer(1)
-    assert alu.aluout.value.signed_integer == a-b
+    assert alu.aluout.value.signed_integer == a - b
 
-    a, b = gen_rand(lambda a,b: b-a > -127 and b-a < 127) 
+    a, b = gen_rand(lambda a, b: b - a > -127 and b - a < 127)
     alu.a.value = a
     alu.b.value = b
 
-    alu.cins.value = 0x5f
+    alu.cins.value = 0x5F
     await Timer(1)
-    assert alu.aluout.value.signed_integer == b-a
+    assert alu.aluout.value.signed_integer == b - a
 
 
 @cocotb.test()
@@ -145,52 +151,53 @@ async def test_alu_additions_overflows(dut):
 
     # b+1
     alu.b.value = 127
-    alu.cins.value = 0x5a
+    alu.cins.value = 0x5A
     await Timer(1)
     assert alu.carryout.value == 1
     assert alu.aluout.value.signed_integer == -128
 
     # a-1
     alu.a.value = -127
-    alu.cins.value = 0x5b
+    alu.cins.value = 0x5B
     await Timer(1)
     assert alu.carryout.value == 1
     assert alu.aluout.value.signed_integer == -128
 
     # b-1
     alu.b.value = -127
-    alu.cins.value = 0x5c
+    alu.cins.value = 0x5C
     await Timer(1)
     assert alu.carryout.value == 1
     assert alu.aluout.value.signed_integer == -128
 
     # Test with overflow
-    #a, b = gen_rand(lambda a,b: a+b > 127) 
-    #alu.a.value = a
-    #alu.b.value = b
+    # a, b = gen_rand(lambda a,b: a+b > 127)
+    # alu.a.value = a
+    # alu.b.value = b
 
-    #alu.cins.value = 0x5d
-    #await Timer(1)
-    #assert alu.overout.value == 1
-    #assert alu.aluout.value.signed_integer == (a+b) & 0xFF
+    # alu.cins.value = 0x5d
+    # await Timer(1)
+    # assert alu.overout.value == 1
+    # assert alu.aluout.value.signed_integer == (a+b) & 0xFF
 
-    #a, b = gen_rand(lambda a,b: a-b < 0) 
-    #alu.a.value = a
-    #alu.b.value = b
+    # a, b = gen_rand(lambda a,b: a-b < 0)
+    # alu.a.value = a
+    # alu.b.value = b
 
-    #alu.cins.value = 0x5e
-    #await Timer(1)
-    #assert alu.carryout.value == 1
-    #assert alu.aluout.value.signed_integer == (a-b) & 0xFF
+    # alu.cins.value = 0x5e
+    # await Timer(1)
+    # assert alu.carryout.value == 1
+    # assert alu.aluout.value.signed_integer == (a-b) & 0xFF
 
-    #a, b = gen_rand(lambda a,b: b-a < 0) 
-    #alu.a.value = a
-    #alu.b.value = b
+    # a, b = gen_rand(lambda a,b: b-a < 0)
+    # alu.a.value = a
+    # alu.b.value = b
 
-    #alu.cins.value = 0x5f
-    #await Timer(1)
-    #assert alu.carryout.value == 1
-    #assert alu.aluout.value.signed_integer == (b-a) & 0xFF
+    # alu.cins.value = 0x5f
+    # await Timer(1)
+    # assert alu.carryout.value == 1
+    # assert alu.aluout.value.signed_integer == (b-a) & 0xFF
+
 
 @cocotb.test()
 async def test_alu_extra(dut):
@@ -205,13 +212,13 @@ async def test_alu_extra(dut):
     await Timer(1)
     assert alu.aluout.value == (a & 0xFF) | (b & 0xFF)
 
-    a, b = gen_rand(lambda a,b: a+b+1 < 127 and a+b+1 > -127) 
+    a, b = gen_rand(lambda a, b: a + b + 1 < 127 and a + b + 1 > -127)
     alu.a.value = a
     alu.b.value = b
     alu.cins.value = 0x62
     alu.carryin.value = 1
     await Timer(1)
-    assert alu.aluout.value.signed_integer == a+b+1
+    assert alu.aluout.value.signed_integer == a + b + 1
 
     b = random.randint(1, 7)
     alu.b.value = b

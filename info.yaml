@@ -59,7 +59,7 @@ project:
     - "cmp.v"
     - "cu.v"
     - "jmp.v"
-    - "tt_um_jrb8_computer.v"
+    - "tt_um_aerox2_jrb8_computer.v"
 
 # The pinout of your project. Leave unused pins blank. DO NOT delete or add any pins.
 pinout:

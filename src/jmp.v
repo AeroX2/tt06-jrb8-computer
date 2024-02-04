@@ -3,7 +3,7 @@ module jmp(
 	input [7:0] databus,
 	input [15:0] pcin,
 	input clk,
-	input reset,
+	input rst,
 	input zflag,
 	input oflag,
 	input cflag,
@@ -33,14 +33,13 @@ module jmp(
 	wire [10:0] flags = {slge, slg, sleq, sls, lge, lg, leq, ls, neq, eq, 1'b1};
 	wire [3:0] sel = val[3:0];
 
-	wire test = flags[sel];
-	assign pcoe = test & oe;
+	assign pcoe = oe ? flags[sel] : 0;
 
 	reg [7:0] highbits;
-	always @(posedge clk, posedge reset)
+	always @(posedge clk, posedge rst)
 	begin
-		if (reset)
-			highbits <= 8'b0;
+		if (rst)
+			highbits <= 8'h00;
 		else if (clk)
 			highbits <= databus;
 	end
@@ -49,5 +48,5 @@ module jmp(
 	wire [15:0] pcadd = pcin + two_byte_address;
 
 	wire [15:0] muxoutput = val[4] ? pcadd : two_byte_address;
-	assign pcout = pcoe ? muxoutput : 16'b0;
+	assign pcout = pcoe ? muxoutput : 16'h0000;
 endmodule

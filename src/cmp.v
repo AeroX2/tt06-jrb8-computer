@@ -4,15 +4,15 @@ module cmp(
 	input overflow,
 	input carry,
 	input clk,
-	input reset,
+	input rst,
 	output reg zflag,
 	output reg oflag,
 	output reg cflag,
 	output reg sflag
 );
-	always @(posedge clk, posedge reset)
+	always @(posedge clk, posedge rst)
 	begin
-		if (reset) begin
+		if (rst) begin
 			zflag <= 0;
 			oflag <= 0;
 			cflag <= 0;

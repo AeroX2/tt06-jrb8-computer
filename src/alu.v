@@ -23,7 +23,7 @@ module alu(
 	wire io = val[4];
 	wire carry = val[5];
 	// wire cselect = val[7:6];
-	assign cmpo = oe & val[8];
+	assign cmpo = oe && val[8];
 	
 	wire [7:0] aandz = za ? 0 : a;
 	wire [7:0] bandz = zb ? 0 : b;
@@ -31,7 +31,7 @@ module alu(
 	wire signed [7:0] xora = aandz ^ {8{ia}};
 	wire signed [7:0] xorb = bandz ^ {8{ib}};
 	
-	wire carried = carry & carryin;
+	wire carried = carry && carryin;
 	
 	wire signed [8:0] sum = xora + xorb + carried;
 	wire signed [7:0] added = sum[7:0];

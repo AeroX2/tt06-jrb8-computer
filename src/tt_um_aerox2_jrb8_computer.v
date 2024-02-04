@@ -13,6 +13,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	wire rst = !rst_n;
 	wire [7:0] databus;	
 
+	reg [7:0] mar;
 	reg [7:0] areg;
 	reg [7:0] creg;
 	reg [7:0] dreg;
@@ -49,9 +50,9 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	wire ram_in_flag = uo_out[3];
 	wire ram_out_flag = uo_out[4];
 
-	reg [7:0] rom;
-	reg [7:0] ram;
-	reg [4:0] serial_counter;
+	reg [7:0] rom [0:255];
+	reg [7:0] ram [0:255];
+	reg [15:0] serial_counter;
 	reg serial_out_reg;
 
 	wire executing = serial_counter == 0;
@@ -62,20 +63,25 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	assign ram_in_flag = rami;
 	assign ram_out_flag = ramo;
 
-
+	int i;
 	always @(
 		posedge sclk,
-		posedge romo,
-		posedge rami,
-		posedge ramo,
+		// posedge romo,
+		// posedge rami,
+		// posedge ramo,
 		posedge rst
 	)
 	begin
 		if (rst) begin
 			serial_counter <= 0;
 			serial_out_reg <= 0;
-			rom <= 8'b00;
-			ram <= 8'b00;
+
+			for (i = 0; i < 255; i++) begin
+				rom[i] = 0;
+			end
+			for (i = 0; i < 255; i++) begin
+				ram[i] = 0;
+			end
 		end else if (sclk && serial_counter > 0 && ready) begin
 			if (romo) begin
 				if (serial_counter <= 8) begin
@@ -84,26 +90,30 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 					serial_out_reg <= pc[serial_counter-1-8];
 				end
 			end else if (rami) begin
-				ram[serial_counter-1] <= serial_in;
+				ram[serial_counter-1] <= {7'b00, serial_in};
 			end else if (ramo) begin
-				serial_out_reg <= ram[serial_counter-1];
+				// serial_out_reg <= ram[serial_counter-1];
 			end
 			serial_counter <= serial_counter-1;
 		end else if (romo && serial_counter == 0) begin
-			serial_counter <= 16+8;
+			serial_counter <= 255;
 		end else if ((rami | ramo) && serial_counter == 0) begin
-			serial_counter <= 8;
+			serial_counter <= 256;
+			// serial_counter <= 8;
 		end
 	end
 
 	always @(posedge clk, posedge rst)
 	begin
 		if (rst) begin
+			mar <= 0;
 			areg <= 0;
 			creg <= 0;
 			dreg <= 0;
 			oreg <= 0;
 		end else if (clk & executing) begin
+			if (mar)
+				mar <= databus;
 			if (ai)
 				areg <= databus;
 			if (ci)
@@ -139,8 +149,8 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	assign uio_oe = 8'h00;
 
 	wire [7:0] aluout;
-	wire [7:0] romg = romo ? rom : 8'b00;
-	wire [7:0] ramg = ramo ? ram : 8'b00;
+	wire [7:0] romg = romo ? rom[pc] : 8'b00;
+	wire [7:0] ramg = ramo ? ram[mar] : 8'b00;
 	assign databus = romg | ramg | aluout;
 
 	wire [7:0] cins;

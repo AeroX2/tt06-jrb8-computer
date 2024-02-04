@@ -5,7 +5,7 @@ from cocotb.triggers import RisingEdge, FallingEdge, Timer, ClockCycles
 
 
 def setup(dut):
-    cmp = dut.tt_um_jrb8_computer.cmp
+    cmp = dut.tt_um_aerox2_jrb8_computer.cmp
     clk = cmp.clk
 
     clock = Clock(clk, 10, units="us")

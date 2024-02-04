@@ -5,12 +5,13 @@ from cocotb.triggers import RisingEdge, FallingEdge, Timer, ClockCycles
 
 
 def setup(dut):
-    jmp = dut.tt_um_jrb8_computer.jmp
+    jmp = dut.tt_um_aerox2_jrb8_computer.jmp
     clk = jmp.clk
 
     clock = Clock(clk, 10, units="us")
     cocotb.start_soon(clock.start())
     return jmp, clk
+
 
 async def jmp_tick(jmp, clk):
     pc_value_high = random.randint(0, 255)
@@ -23,7 +24,7 @@ async def jmp_tick(jmp, clk):
     jmp.oe.value = 1
     await ClockCycles(clk, 1)
 
-    return (pc_value_high << 8 | pc_value_low)
+    return pc_value_high << 8 | pc_value_low
 
 
 @cocotb.test()
@@ -59,6 +60,7 @@ async def test_jmp_jumps_correctly(dut):
     assert jmp.pcoe.value == 1
     assert jmp.pcout.value == pc_out
 
+
 @cocotb.test()
 async def test_jmp_conditions(dut):
     jmp, clk = setup(dut)
@@ -88,6 +90,6 @@ async def test_jmp_conditions(dut):
     await ClockCycles(clk, 1)
     assert jmp.pcoe.value == 1
 
-    # Realisitcally we should also test all the other conditions but
+    # Realistically we should also test all the other conditions but
     # its a little complex and this should hopefully be tested by the
     # full integration test

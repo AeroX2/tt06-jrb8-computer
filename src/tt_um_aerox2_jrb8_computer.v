@@ -13,7 +13,6 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	wire rst = !rst_n;
 	wire [7:0] databus;	
 
-
 	reg [7:0] areg;
 	reg [7:0] creg;
 	reg [7:0] dreg;
@@ -40,14 +39,85 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	wire ramo = out_decoder[5];
 	wire jmpo = out_decoder[6];
 
-	always @(posedge clk, posedge rst_n)
+	wire sclk = ui_in[0];
+	wire ready = ui_in[1];
+	wire serial_in = ui_in[2];
+
+	wire serial_out = uo_out[0];
+	wire pc_in_flag = uo_out[1];
+	wire rom_out_flag = uo_out[2];
+	wire ram_in_flag = uo_out[3];
+	wire ram_out_flag = uo_out[4];
+
+	reg [7:0] rom;
+	reg [7:0] ram;
+	reg [4:0] serial_counter;
+	reg serial_out_reg;
+
+	assign pc_in_flag = !executing && serial_counter >= 8;
+	assign serial_out = serial_out_reg;
+	assign rom_out_flag = romo;
+	assign ram_in_flag = rami;
+	assign ram_out_flag = ramo;
+
+	wire executing = serial_counter == 0;
+
+	always @(
+		posedge sclk,
+		posedge romo,
+		posedge rst
+	)
 	begin
-		if (rst_n) begin
+		if (rst) begin
+			serial_counter <= 0;
+			serial_out_reg <= 0;
+			rom <= 8'b00;
+		end else if (sclk && serial_counter > 0 && ready) begin
+			if (romo) begin
+				serial_counter = serial_counter - 1;
+				if (serial_counter < 8) begin
+					rom[serial_counter] <= serial_in;
+				end else begin
+					serial_out_reg <= pc[serial_counter-8];
+				end
+			end
+		end else if (romo && serial_counter == 0) begin
+			serial_counter <= 16+8;
+		end
+	end
+
+	always @(
+		posedge sclk,
+		posedge rami,
+		posedge ramo,
+		posedge rst
+	)
+	begin
+		if (rst) begin
+			serial_counter <= 0;
+			serial_out_reg <= 0;
+			ram <= 8'b00;
+		end else if (sclk && serial_counter > 0 && ready) begin
+			if (rami) begin
+				serial_counter = serial_counter - 1;
+				ram[serial_counter] <= serial_in;
+			end else if (ramo) begin
+				serial_counter = serial_counter - 1;
+				serial_out_reg <= ram[serial_counter];
+			end
+		end else if ((rami | ramo) && serial_counter == 0) begin
+			serial_counter <= 8;
+		end
+	end
+
+	always @(posedge clk, posedge rst)
+	begin
+		if (rst) begin
 			areg <= 0;
 			creg <= 0;
 			dreg <= 0;
 			oreg <= 0;
-		end else if (clk) begin
+		end else if (clk & executing) begin
 			if (ai)
 				areg <= databus;
 			if (ci)
@@ -63,12 +133,11 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
     wire [15:0] pcin;
 	reg [15:0] pc;
 
-
-	always @(posedge clk, posedge rst_n)
+	always @(posedge clk, posedge rst)
 	begin
-		if (rst_n) begin
+		if (rst) begin
 			pc <= 0;
-		end else if (clk) begin
+		end else if (clk & executing) begin
 			if (pcinflag) begin
 				pc = pcin;
 			end else begin
@@ -77,7 +146,16 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		end
 	end
 
-	assign uo_out = oreg;
+	assign uo_out[5] = 0;
+	assign uo_out[6] = 0;
+	assign uo_out[7] = 0;
+	assign uio_out = oreg;
+	assign uio_oe = 8'h00;
+
+	wire [7:0] aluout;
+	wire [7:0] romg = romo ? rom : 8'b00;
+	wire [7:0] ramg = ramo ? ram : 8'b00;
+	assign databus = romg | ramg | aluout;
 
 	wire [7:0] cins;
 	wire pcc;
@@ -85,7 +163,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	cu cu(
 		.irin(databus),
 		.iri_in(iri),
-		.clk(clk),
+		.clk(clk & executing),
 		.reset(rst),
 		.cuout(cins),
 		.inflags(inflags),
@@ -94,6 +172,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.iri_out(iri)
 	);
 
+	wire romo = pcc | romot;
 	wire [7:0] c_or_d_reg = doo ? creg : dreg;
 
 	wire aluo = ao | co | doo;
@@ -107,7 +186,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.carryin(cflag),
 		.oe(aluo),
 		.cins(cins),
-		.aluout(databus),
+		.aluout(aluout),
 		.overout(overout),
 		.carryout(carryout),
 		.cmpo(cmpo)
@@ -121,7 +200,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.cmpin(databus),
 		.overflow(overout),
 		.carry(carryout),
-		.clk(clk),
+		.clk(clk & executing),
 		.reset(rst),
 		.zflag(zflag),
 		.oflag(oflag),
@@ -129,11 +208,12 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.sflag(sflag)
 	);
   
+	// TODO This will somehow have to trigger the serial out for pc otherwise we will be restricted to 8bit addressing
 	jmp jmp(
 		.cins(cins),
 		.pcin(pc),
 		.databus(databus),
-		.clk(clk),
+		.clk(clk & executing),
 		.reset(rst),
 		.zflag(zflag),
 		.oflag(oflag),
@@ -142,5 +222,4 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.pcoe(pcinflag),
 		.pcout(pcin)
 	);
-
 endmodule

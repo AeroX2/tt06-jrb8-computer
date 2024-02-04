@@ -10,8 +10,8 @@
 #     - cmp.v
 #     - cu.v
 #     - jmp.v
-#     - tt_um_jrb8_computer.v
-#   top_module:  "tt_um_jrb8_computer"      # Put the name of your top module here, must start with "tt_um_". Make it unique by including your github username
+#     - tt_um_aerox2_jrb8_computer.v
+#   top_module:  "tt_um_aerox2_jrb8_computer"      # Put the name of your top module here, must start with "tt_um_". Make it unique by including your github username
 
 # # How many tiles your design occupies? A single tile is about 167x108 uM.
 #   tiles: "1x1"    # Valid values: 1x1, 1x2, 2x2, 3x2, 4x2 or 8x2
@@ -64,9 +64,9 @@ project:
 # The pinout of your project. Leave unused pins blank. DO NOT delete or add any pins.
 pinout:
   # Inputs
-  ui[0]: ""
-  ui[1]: ""
-  ui[2]: ""
+  ui[0]: "sclk"
+  ui[1]: "sending / ready"
+  ui[2]: "serial_in"
   ui[3]: ""
   ui[4]: ""
   ui[5]: ""
@@ -74,24 +74,24 @@ pinout:
   ui[7]: ""
 
   # Outputs
-  uo[0]: "output_pin_bit_0"
-  uo[1]: "output_pin_bit_1"
-  uo[2]: "output_pin_bit_2"
-  uo[3]: "output_pin_bit_3"
-  uo[4]: "output_pin_bit_4"
-  uo[5]: "output_pin_bit_5"
-  uo[6]: "output_pin_bit_6"
-  uo[7]: "output_pin_bit_7"
+  uo[0]: "serial_out"
+  uo[1]: "pc_in_flag"
+  uo[2]: "rom_out_flag"
+  uo[3]: "ram_in_flag"
+  uo[4]: "ram_out_flag"
+  uo[5]: ""
+  uo[6]: ""
+  uo[7]: ""
 
   # Bidirectional pins
-  uio[0]: ""
-  uio[1]: ""
-  uio[2]: ""
-  uio[3]: ""
-  uio[4]: ""
-  uio[5]: ""
-  uio[6]: ""
-  uio[7]: ""
+  uio[0]: "output_pin_bit_0"
+  uio[1]: "output_pin_bit_1"
+  uio[2]: "output_pin_bit_2"
+  uio[3]: "output_pin_bit_3"
+  uio[4]: "output_pin_bit_4"
+  uio[5]: "output_pin_bit_5"
+  uio[6]: "output_pin_bit_6"
+  uio[7]: "output_pin_bit_7"
 
 # Do not change!
 yaml_version: 6

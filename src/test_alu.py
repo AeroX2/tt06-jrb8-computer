@@ -5,7 +5,7 @@ from cocotb.triggers import RisingEdge, FallingEdge, Timer, ClockCycles
 
 
 def setup(dut):
-    alu = dut.tt_um_jrb8_computer.alu
+    alu = dut.tt_um_aerox2_jrb8_computer.alu
 
     a = random.randint(-126, 126)
     b = random.randint(-126, 126)

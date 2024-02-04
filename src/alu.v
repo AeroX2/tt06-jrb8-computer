@@ -14,7 +14,7 @@ module alu(
 		$readmemh("alu_rom.mem", alu_rom);
 	end
 	
-	wire [7:0] val = alu_rom[cins];
+	wire [8:0] val = alu_rom[cins];
 	
 	wire za = val[0];
 	wire ia = val[1];

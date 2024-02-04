@@ -20,7 +20,7 @@ module cu(
 	always @(posedge clk, posedge reset)
 	begin
 		if (reset)
-			ir_reg <= 1'b0;
+			ir_reg <= 8'b0;
 		else if (clk && iri_in)
 			ir_reg <= irin;
 	end
@@ -40,7 +40,7 @@ module cu(
 	wire [7:0] val = cu_rom[ir_reg];
 	wire [7:0] val2 = cu_rom_2[ir_reg];
 
-	wire [7:0] fin = (val & cuctr[1]) | (val2 & cuctr[2]);
+	wire [7:0] fin = (cuctr[1] ? val : 8'b00) | (cuctr[2] ? val2 : 8'b00);
 	assign inflags = fin[3:0];
 	assign outflags = fin[6:4];
 	assign pcc = iri_out | fin[7];

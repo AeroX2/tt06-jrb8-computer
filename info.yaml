@@ -59,6 +59,7 @@ project:
     - "cmp.v"
     - "cu.v"
     - "jmp.v"
+    - "spi.v"
     - "tt_um_aerox2_jrb8_computer.v"
 
 # The pinout of your project. Leave unused pins blank. DO NOT delete or add any pins.
@@ -88,7 +89,7 @@ pinout:
   uio[1]: "mosi"
   uio[2]: "miso"
   uio[3]: "sck"
-  uio[4]: ""
+  uio[4]: "use external sclk"
   uio[5]: ""
   uio[6]: ""
   uio[7]: ""

@@ -9,6 +9,7 @@ module alu(
 	output overout,
 	output cmpo
 );
+	// TODO: Check if roms are actually getting read
 	reg [8:0] alu_rom [0:255];
 	initial begin
 		$readmemh("alu_rom.mem", alu_rom);

@@ -9,6 +9,7 @@ module cu(
 	output iri_out,
 	output [7:0] cuout
 );
+	// TODO: Check if roms are actually getting read
 	reg [7:0] cu_rom [0:255];
 	reg [7:0] cu_rom_2 [0:255];
 	initial begin

@@ -59,6 +59,9 @@ async def test_full(dut):
     # Only for debugging
     _computer = dut.tt_um_aerox2_jrb8_computer
 
+    print("PC", _computer.pc.value.integer)
+    print("ROM[PC]", _computer.rom.value.integer)
+
     computer.uio_in[4].value = 1
     sclk = Clock(computer.uio_in[3], 10, units="us")
 

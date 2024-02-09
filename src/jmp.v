@@ -13,6 +13,8 @@ module jmp(
 	output [15:0] pcout
 );
 	reg [4:0] jmp_rom [0:255];
+
+	// TODO: Check if roms are actually getting read
 	initial begin
 		$readmemh("jmp_rom.mem", jmp_rom);
 	end

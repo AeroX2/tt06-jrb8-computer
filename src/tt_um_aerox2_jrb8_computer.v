@@ -24,23 +24,26 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	wire [4:0] inflags;
 	wire [3:0] outflags;
 
-	wire [7:0] in_decoder = 8'b0000_0001 << inflags;
+	wire [15:0] in_decoder = 8'b0000_0001 << inflags;
 	wire [7:0] out_decoder = 8'b0000_0001 << outflags;
 
-	wire oi = in_decoder[0];
-	wire rami = in_decoder[1];
-	wire mari = in_decoder[2];
-	wire ai = in_decoder[3];
-	wire ci = in_decoder[4];
-	wire di = in_decoder[5];
+	wire oi = in_decoder[1];
+	wire ramil = in_decoder[2];
+	wire mari = in_decoder[3];
+	wire ai = in_decoder[4];
+	wire ci = in_decoder[5];
+	wire di = in_decoder[6];
+	// wire ramih = in_decoder[7];
+	wire halt = in_decoder[15];
 
-	wire io = out_decoder[0];
-	wire ao = out_decoder[1];
-	wire co = out_decoder[2];
-	wire doo = out_decoder[3];
-	wire romot = out_decoder[4];
-	wire ramo = out_decoder[5];
-	wire jmpo = out_decoder[6];
+	wire io = out_decoder[1];
+	wire ao = out_decoder[2];
+	wire co = out_decoder[3];
+	wire doo = out_decoder[4];
+	wire romot = out_decoder[5];
+	wire ramo = out_decoder[6];
+	wire jmpo = out_decoder[7];
+
 	wire romo = pcc | romot;
 
 	wire [7:0] cins;
@@ -49,7 +52,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	cu cu(
 		.irin(databus),
 		.iri_in(iri),
-		.clk(clk && executing),
+		.clk(clk),
 		.rst(rst),
 		.cuout(cins),
 		.inflags(inflags),
@@ -58,57 +61,50 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.iri_out(iri)
 	);
 
-	reg [7:0] rom;
-	reg [7:0] ram [0:255];
+	wire [7:0] rom;
+	wire [7:0] ram;
 
-	//TODO
-	wire executing = romo;
+	wire cs_rom;
+	wire cs_ram;
+	wire mosi;
 
-	// Appease the synthesis linter
-	// assign uio_out[0] = 0;
-	// assign uio_out[1] = 0;
+	// SPI Ram for ROM memory
+	assign uio_oe = 8'b00011010;
+
+	wire miso = uio_in[2];
+	wire sclk = uio_in[5] ? uio_in[3] : clk;
+
+	assign uio_out[0] = cs_rom;
+	assign uio_out[1] = mosi;
 	assign uio_out[2] = 0;
 	assign uio_out[3] = 0;
-	assign uio_out[4] = 0;
+	assign uio_out[4] = cs_ram;
 	assign uio_out[5] = 0;
 	assign uio_out[6] = 0;
 	assign uio_out[7] = 0;
 
-	// SPI Ram for ROM memory
-	// reg cs;
-	// reg mosi;
-	assign uio_oe = 8'b00001010;
-
-	// assign uio_out[0] = cs;
-	// assign uio_out[1] = mosi;
-	wire cs = uio_out[0];
-	wire mosi = uio_out[1];
-	wire miso = uio_in[2];
-	wire sclk = uio_in[4] ? uio_in[3] : clk;
-
+	wire executing;
 	spi spi(
-		.sclk(sclk),
 		.rst(rst),
-		.address(pc),
-		.data(rom),
-		.cs(cs),
-		.mosi(mosi),
-		.miso(miso),
-		.ready(romo)
-	);
+		.romo(romo),
+		.pc(pc),
+		.rom(rom),
 
-	// 1 byte by 256 byte RAM
-	int i;
-	always @(posedge clk, posedge rst)
-	begin
-		if (rst) begin
-			for (i = 0; i < 255; i++) begin
-				ram[i] = 0;
-			end
-		end else if (clk && executing && rami) begin
-			ram[mar] <= databus;	
-		end
-	end
+		.rami(ramil),
+		.ramo(ramo),
+		.mar({ 8'h0, mar }),
+		.ram(ram),
+
+		.databus(databus),
+
+		.executing(executing),
+
+		.sclk(sclk),
+		.cs_rom(cs_rom),
+		.cs_ram(cs_ram),
+		.mosi(mosi),
+		.miso(miso)
+	);
 
 	// Internal registers
 	// A, B, C, D, O, I
@@ -121,7 +117,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 			dreg <= 0;
 			oreg <= 0;
 			ireg <= 0;
-		end else if (clk && executing) begin
+		end else if (clk) begin
 			if (mari)
 				mar <= databus;
 			if (ai)
@@ -145,7 +141,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	begin
 		if (rst)
 			pc <= 0;
-		else if (clk && executing) begin
+		else if (clk && pcc && executing) begin
 			if (pcinflag) 
 				pc <= pcin;
 			else 
@@ -156,9 +152,9 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	// Databus
 	wire [7:0] aluout;
 	wire [7:0] romg = romo ? rom : 8'h00;
-	wire [7:0] ramg = ramo ? ram[mar] : 8'h00;
+	wire [7:0] ramg = ramo ? ram : 8'h00;
 	wire [7:0] iorg = io ? ireg : 8'h00;
-	assign databus = romg | ramg | aluout | iorg;
+	assign databus = romg | aluout | iorg;
 
 	// ALU
 	wire [7:0] c_or_d_reg = doo ? creg : dreg;
@@ -188,7 +184,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.cmpin(databus),
 		.overflow(overout),
 		.carry(carryout),
-		.clk(clk && executing),
+		.clk(clk),
 		.rst(rst),
 		.zflag(zflag),
 		.oflag(oflag),
@@ -202,7 +198,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.cins(cins),
 		.pcin(pc),
 		.databus(databus),
-		.clk(clk && executing),
+		.clk(clk),
 		.rst(rst),
 		.zflag(zflag),
 		.oflag(oflag),

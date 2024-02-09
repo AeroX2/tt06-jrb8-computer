@@ -1,14 +1,27 @@
 module spi(
-  input wire sclk,
-  input wire rst,
-  input wire ready,
-  input reg [15:0] address,
-  output reg [7:0] data,
-  output reg cs,
-  output reg mosi,
-  input wire miso
+  input rst,
+  input romo,
+  input [15:0] pc,
+  output [7:0] rom,
+
+  input rami,
+  input ramo,
+  input [15:0] mar,
+  output [7:0] ram,
+
+  input databus,
+
+  output executing,
+
+  input sclk,
+  output cs_rom,
+  output cs_ram,
+  output mosi,
+  input miso
 );
   localparam READ_COMMAND = 8'h03;
+  // TODO;
+  localparam WRITE_COMMAND = 8'h02;
 
   localparam IDLE = 0,
     SEND_COMMAND = 1,
@@ -18,29 +31,46 @@ module spi(
   reg [4:0] shift_counter;
   reg [3:0] state;
 
+  reg [7:0] data_reg;
+  reg executing_reg;
+
+  reg rising_edge;
+  reg cs_reg;
+  reg mosi_reg;
+
   always @(
-    posedge sclk,
+    // Negedge of sclk because we want to clock the data in before the next positive edge
+    // SPI mode should be 0.
+    negedge sclk, 
     posedge rst
   ) begin
     if (rst) begin
       shift_counter <= 0;
       state <= IDLE;
-      data <= 0;
-      mosi <= 0;
-      cs <= 1;
-    end else if (sclk) begin
+
+      data_reg <= 0;
+      executing_reg <= 1;
+
+      rising_edge <= 0;
+
+      cs_reg <= 1;
+      mosi_reg <= 0;
+    end else if (!sclk) begin
       case (state)
         IDLE: begin
-          mosi <= 0;
-          cs <= 1;
-          if (ready) begin
-            cs <= 0;
+          executing_reg <= 1;
+          mosi_reg <= 0;
+          cs_reg <= 1;
+          if ((romo || ramo) & ~rising_edge) begin
+            executing_reg <= 0;
+            cs_reg <= 0;
             shift_counter <= 7;
             state <= SEND_COMMAND;
           end
+          rising_edge <= romo || ramo;
         end
         SEND_COMMAND: begin
-          mosi <= READ_COMMAND[shift_counter];
+          mosi_reg <= READ_COMMAND[shift_counter];
           shift_counter <= shift_counter - 1;
           if (shift_counter == 0) begin
             shift_counter <= 15;
@@ -48,7 +78,11 @@ module spi(
           end
         end
         SEND_ADDRESS: begin
-          mosi <= address[shift_counter];
+          if (romo) begin
+            mosi_reg <= pc[shift_counter];
+          end else begin
+            mosi_reg <= mar[shift_counter];
+          end
           shift_counter <= shift_counter - 1;
           if (shift_counter == 0) begin
             shift_counter <= 7;
@@ -56,14 +90,22 @@ module spi(
           end
         end
         RECEIVE_DATA: begin
-          data[shift_counter] <= miso;
+          data_reg[shift_counter] <= miso;
           shift_counter <= shift_counter - 1;
           if (shift_counter == 0) begin
-            cs <= 1;
+            cs_reg <= 1;
             state <= IDLE;
           end
         end
       endcase
     end
   end
+
+  assign executing = executing_reg;
+  assign rom = romo ? data_reg : 0;
+  assign ram = (ramo && !romo) ? data_reg : 0;
+  assign mosi = mosi_reg;
+
+  assign cs_rom = romo ? cs_reg : 1;
+  assign cs_ram = (ramo && !romo) ? cs_reg : 1;
 endmodule

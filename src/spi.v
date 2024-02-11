@@ -9,7 +9,7 @@ module spi(
   input [15:0] mar,
   output [7:0] ram,
 
-  input databus,
+  input [7:0] databus,
 
   output executing,
 
@@ -20,13 +20,13 @@ module spi(
   input miso
 );
   localparam READ_COMMAND = 8'h03;
-  // TODO;
   localparam WRITE_COMMAND = 8'h02;
 
   localparam IDLE = 0,
     SEND_COMMAND = 1,
     SEND_ADDRESS = 2,
-    RECEIVE_DATA = 3;
+    SEND_DATA    = 3,
+    RECEIVE_DATA = 4;
 
   reg [4:0] shift_counter;
   reg [3:0] state;
@@ -61,16 +61,20 @@ module spi(
           executing_reg <= 1;
           mosi_reg <= 0;
           cs_reg <= 1;
-          if ((romo || ramo) & ~rising_edge) begin
+          if ((romo || ramo || rami) & ~rising_edge) begin
             executing_reg <= 0;
             cs_reg <= 0;
             shift_counter <= 7;
             state <= SEND_COMMAND;
           end
-          rising_edge <= romo || ramo;
+          rising_edge <= romo || ramo || rami;
         end
         SEND_COMMAND: begin
-          mosi_reg <= READ_COMMAND[shift_counter];
+          if (rami)
+            mosi_reg <= WRITE_COMMAND[shift_counter];
+          else
+            mosi_reg <= READ_COMMAND[shift_counter];
+
           shift_counter <= shift_counter - 1;
           if (shift_counter == 0) begin
             shift_counter <= 15;
@@ -86,7 +90,18 @@ module spi(
           shift_counter <= shift_counter - 1;
           if (shift_counter == 0) begin
             shift_counter <= 7;
-            state <= RECEIVE_DATA;
+            if (rami)
+              state <= SEND_DATA;
+            else
+              state <= RECEIVE_DATA;
+          end
+        end
+        SEND_DATA: begin
+          mosi_reg <= databus[shift_counter];
+          shift_counter <= shift_counter - 1;
+          if (shift_counter == 0) begin
+            cs_reg <= 1;
+            state <= IDLE;
           end
         end
         RECEIVE_DATA: begin
@@ -107,5 +122,5 @@ module spi(
   assign mosi = mosi_reg;
 
   assign cs_rom = romo ? cs_reg : 1;
-  assign cs_ram = (ramo && !romo) ? cs_reg : 1;
+  assign cs_ram = ((rami || ramo) && !romo) ? cs_reg : 1;
 endmodule

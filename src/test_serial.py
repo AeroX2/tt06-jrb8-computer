@@ -6,7 +6,8 @@ from cocotb.triggers import RisingEdge, FallingEdge, Timer, ClockCycles
 IDLE = 0
 SEND_COMMAND = 1
 SEND_ADDRESS = 2
-RECEIVE_DATA = 3
+SEND_DATA    = 3
+RECEIVE_DATA = 4
 
 async def setup(dut):
     spi = dut.tt_um_aerox2_jrb8_computer.spi
@@ -14,6 +15,7 @@ async def setup(dut):
 
     spi.romo.value = 0
     spi.ramo.value = 0
+    spi.rami.value = 0
 
     clock = Clock(sclk, 10, units="us")
     cocotb.start_soon(clock.start())
@@ -120,4 +122,51 @@ async def test_serial_ram_out(dut):
     await Timer(1)  # <= causes a slight delay, wait for it
 
     assert bin(spi.ram.value.integer) == bin(input)
+    assert spi.state.value == IDLE
+
+@cocotb.test()
+async def test_serial_ram_in(dut):
+    spi, sclk = await setup(dut)
+    
+    mar_value = random.randint(0, 65536)
+    spi.mar.value = mar_value
+
+    databus_value = random.randint(0, 255)
+    spi.databus.value = databus_value
+    await ClockCycles(sclk, 100)  # We should be able to wait here forever until ready
+    assert spi.state.value == IDLE
+    assert spi.cs_rom.value == 1
+    assert spi.cs_ram.value == 1
+    assert spi.mosi.value == 0
+
+    spi.rami.value = 1
+    await ClockCycles(sclk, 1)
+    await Timer(1)  # `<=` causes a slight delay, wait for it
+    assert spi.state.value == SEND_COMMAND
+    assert spi.cs_rom.value == 1
+    assert spi.cs_ram.value == 0
+    assert spi.mosi.value == 0
+
+    output = 0
+    for i in range(8):
+        await ClockCycles(sclk, 1)
+        await Timer(1)  # <= causes a slight delay, wait for it
+        output |= spi.mosi.value.integer << (7 - i)
+    assert output == 0x02 #SPI Write command is 0x02
+    assert spi.state.value == SEND_ADDRESS
+
+    output = 0
+    for i in range(16):
+        await ClockCycles(sclk, 1)
+        await Timer(1)  # <= causes a slight delay, wait for it
+        output |= spi.mosi.value.integer << (15 - i)
+    assert bin(output) == bin(mar_value)
+    assert spi.state.value == SEND_DATA
+
+    output = 0
+    for i in range(8):
+        await ClockCycles(sclk, 1)
+        await Timer(1)  # <= causes a slight delay, wait for it
+        output |= spi.mosi.value.integer << (7 - i)
+    assert bin(output) == bin(databus_value)
     assert spi.state.value == IDLE

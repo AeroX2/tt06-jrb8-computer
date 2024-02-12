@@ -1,11 +1,10 @@
 import cocotb
 import random
-from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge, FallingEdge, Timer, ClockCycles
+from cocotb.triggers import Timer
 
 
 def setup(dut):
-    alu = dut.tt_um_aerox2_jrb8_computer.alu
+    alu = dut.tt_um_aerox2_jrb8_computer.alu_module
 
     a = random.randint(-126, 126)
     b = random.randint(-126, 126)

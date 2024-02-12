@@ -49,7 +49,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	wire [7:0] cins;
 	wire pcc;
 	wire iri;
-	cu cu(
+	cu cu_module(
 		.irin(databus),
 		.iri_in(iri),
 		.clk(clk),
@@ -84,7 +84,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	assign uio_out[7] = 0;
 
 	wire executing;
-	spi spi(
+	spi spi_module(
 		.rst(rst),
 		.romo(romo),
 		.pc(pc),
@@ -163,7 +163,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	wire overout;
 	wire carryout;
 	wire cmpo;
-	alu alu(
+	alu alu_module(
 		.a(areg),
 		.b(c_or_d_reg),
 		.carryin(cflag),
@@ -180,7 +180,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	wire oflag;
 	wire cflag;
 	wire sflag;
-	cmp cmp(
+	cmp cmp_module(
 		.cmpin(databus),
 		.overflow(overout),
 		.carry(carryout),
@@ -194,7 +194,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	);
   
 	// JMP
-	jmp jmp(
+	jmp jmp_module(
 		.cins(cins),
 		.pcin(pc),
 		.databus(databus),

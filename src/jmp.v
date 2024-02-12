@@ -16,7 +16,7 @@ module jmp(
 
 	// TODO: Check if roms are actually getting read
 	initial begin
-		$readmemh("jmp_rom.mem", jmp_rom);
+		$readmemh("../rom/jmp_rom.mem", jmp_rom);
 	end
 
 	wire [4:0] val = jmp_rom[cins];

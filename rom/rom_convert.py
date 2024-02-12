@@ -14,6 +14,6 @@ for line in f[1:]:
 o = [hex(x)[2:] for x in j]
 po = o + ["0"] * (256 - len(o))
 y = " ".join(po)
-f2 = open(sys.argv[1] + ".mem", "w")
+f2 = open(f"../${sys.argv[1]}.mem", "w")
 f2.write(y)
 f2.close()

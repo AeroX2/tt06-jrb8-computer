@@ -4,12 +4,20 @@
 # defaults
 SIM ?= icarus
 TOPLEVEL_LANG ?= verilog
+SRC ?= $(PWD)/../src
 
 # normal simulation
 ifneq ($(GATES),yes)
 
 # this is the only part you should need to modify:
-VERILOG_SOURCES += $(PWD)/tb.v $(PWD)/tt_um_aerox2_jrb8_computer.v $(PWD)/alu.v $(PWD)/cmp.v $(PWD)/cu.v $(PWD)/jmp.v $(PWD)/spi.v
+VERILOG_SOURCES += \
+	$(PWD)/tb.v \
+	$(SRC)/tt_um_aerox2_jrb8_computer.v \
+	$(SRC)/alu.v \
+	$(SRC)/cmp.v \
+	$(SRC)/cu.v \
+	$(SRC)/jmp.v \
+	$(SRC)/spi.v
 
 else
 

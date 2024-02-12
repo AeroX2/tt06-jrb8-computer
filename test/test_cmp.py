@@ -1,10 +1,10 @@
 import cocotb
 import random
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge, FallingEdge, Timer, ClockCycles
+from cocotb.triggers import Timer, ClockCycles
 
 async def setup(dut):
-    cmp = dut.tt_um_aerox2_jrb8_computer.cmp
+    cmp = dut.tt_um_aerox2_jrb8_computer.cmp_module
     clk = cmp.clk
 
     clock = Clock(clk, 10, units="us")

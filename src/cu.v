@@ -13,8 +13,8 @@ module cu(
 	reg [7:0] cu_rom [0:255];
 	reg [7:0] cu_rom_2 [0:255];
 	initial begin
-		$readmemh("cu_rom.mem", cu_rom);
-		$readmemh("cu_rom_2.mem", cu_rom_2);
+		$readmemh("../rom/cu_rom.mem", cu_rom);
+		$readmemh("../rom/cu_rom_2.mem", cu_rom_2);
 	end
 
 	reg [7:0] ir_reg;

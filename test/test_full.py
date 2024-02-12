@@ -1,7 +1,6 @@
 import cocotb
-import random
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge, FallingEdge, Timer, ClockCycles, with_timeout
+from cocotb.triggers import Timer, ClockCycles
 
 ROM = [
    0x60, 0x10, 0x61, 0x12, 0x4d, 0x90, 0x20, 0x0,  
@@ -52,7 +51,8 @@ async def send_rom_data(computer, sclk):
         await ClockCycles(sclk, 1)
         await Timer(1)  # <= causes a slight delay, wait for it
 
-@cocotb.test()
+# Use a seperate stage to force variables and signals to reset.
+@cocotb.test(stage=1)
 async def test_full(dut):
     computer, clk = await setup(dut)
 
@@ -65,9 +65,39 @@ async def test_full(dut):
     computer.uio_in[4].value = 1
     sclk = Clock(computer.uio_in[3], 10, units="us")
 
+		# .a(areg),
+		# .b(c_or_d_reg),
+		# .carryin(cflag),
+		# .oe(aluo),
+		# .cins(cins),
+		# .aluout(aluout),
+		# .overout(overout),
+		# .carryout(carryout),
+		# .cmpo(cmpo)
+
     for _ in range(20):
         print("PC", _computer.pc.value.integer)
         print("ROM[PC]", _computer.rom.value.integer)
+        print("A, B", 
+            _computer.areg.value.integer,
+            _computer.c_or_d_reg.value.integer,
+        )
+        print("ALUOUT, OVEROUT, CARRYOUT", 
+            _computer.aluout.value.integer,
+            _computer.overout.value.integer,
+            _computer.carryout.value.integer,
+        )
+        print("Z O C S", 
+            _computer.zflag.value.integer,
+            _computer.oflag.value.integer,
+            _computer.cflag.value.integer,
+            _computer.sflag.value.integer,
+        )
+        print("test", 
+            _computer.alu_module.sum.value,
+            _computer.alu_module.sum[8].value,
+            _computer.alu_module.carryout.value,
+        )
 
         await ClockCycles(clk, 1)
         if (computer.uio_out[0] == 0):

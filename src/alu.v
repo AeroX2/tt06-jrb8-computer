@@ -12,7 +12,7 @@ module alu(
 	// TODO: Check if roms are actually getting read
 	reg [8:0] alu_rom [0:255];
 	initial begin
-		$readmemh("alu_rom.mem", alu_rom);
+		$readmemh("../rom/alu_rom.mem", alu_rom);
 	end
 	
 	wire [8:0] val = alu_rom[cins];
@@ -34,9 +34,8 @@ module alu(
 	
 	wire carried = carry && carryin;
 	
-	wire signed [8:0] sum = xora + xorb + carried;
+	wire signed [8:0] sum = xora + xorb + {9{8'b0, carried}};
 	wire signed [7:0] added = sum[7:0];
-	assign carryout = sum[8];
 	
 	wire [7:0] anded = xora & xorb;
 	
@@ -49,7 +48,8 @@ module alu(
 	wire [7:0] muxoutput = mh ? (ml ? shiftl : shiftr) : (ml ? anded : added);
 		
 	wire [7:0] out1 = muxoutput ^ {8{io}};
+
 	assign aluout = oe ? out1 : 0;
-	
+	assign carryout = sum[8];
 	assign overout = ((~out1[7]) & a[7] & b[7]) | (out1[7] & ~a[7] & ~b[7]);
 endmodule

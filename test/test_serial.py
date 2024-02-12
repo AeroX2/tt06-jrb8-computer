@@ -1,7 +1,7 @@
 import cocotb
 import random
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge, FallingEdge, Timer, ClockCycles
+from cocotb.triggers import Timer, ClockCycles
     
 IDLE = 0
 SEND_COMMAND = 1
@@ -10,7 +10,7 @@ SEND_DATA    = 3
 RECEIVE_DATA = 4
 
 async def setup(dut):
-    spi = dut.tt_um_aerox2_jrb8_computer.spi
+    spi = dut.tt_um_aerox2_jrb8_computer.spi_module
     sclk = spi.sclk
 
     spi.romo.value = 0

@@ -32,16 +32,16 @@ module cu(
 	begin
 		if (rst)
 			cuctr <= 0;
-		else if (clk)
-			cuctr <= cuctr + 1;
+		else if (clk) 
+			cuctr <= cuctr + 1 >= 2 ? cuctr + 1 : 0;
 	end
 
-	assign iri_out = cuctr[0];
+	assign iri_out = cuctr == 0;
 
 	wire [7:0] val = cu_rom[ir_reg];
 	wire [7:0] val2 = cu_rom_2[ir_reg];
 
-	wire [7:0] fin = (cuctr[1] ? val : 8'h00) | (cuctr[2] ? val2 : 8'h00);
+	wire [7:0] fin = (cuctr == 1 ? val : 8'h00) | (cuctr == 2 ? val2 : 8'h00);
 	assign inflags = fin[3:0];
 	assign outflags = fin[6:4];
 	assign pcc = iri_out | fin[7];

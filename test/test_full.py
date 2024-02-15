@@ -14,7 +14,13 @@ async def setup(dut):
     computer = dut.tt_um_aerox2_jrb8_computer
     clk = computer.clk
 
+    computer.uio_in[5].value = 0
+    sclk = computer.clk
+
     clock = Clock(clk, 10, units="us")
+    cocotb.start_soon(clock.start())
+
+    clock = Clock(sclk, 10, units="us")
     cocotb.start_soon(clock.start())
 
     computer.rst_n.value = 1
@@ -34,10 +40,18 @@ async def setup(dut):
         rst_n=computer.rst_n,
     )
 
-    return mock, clk
+    return mock, clk, sclk
 
 async def send_rom_data(computer, sclk):
-    await ClockCycles(sclk, 8)
+    # await ClockCycles(sclk, 8)
+    await Timer(1)
+
+    read = 0
+    for i in range(8):
+        read |= computer.uio_out[1].value.integer << (7 - i)
+        await ClockCycles(sclk, 1)
+        await Timer(10)  # <= causes a slight delay, wait for it
+    assert bin(read) == bin(0x03)
 
     pc = 0
     for i in range(16):
@@ -45,63 +59,67 @@ async def send_rom_data(computer, sclk):
         await ClockCycles(sclk, 1)
         await Timer(1)  # <= causes a slight delay, wait for it
 
+    print(bin(pc))
     data = ROM[pc]
     for i in range(8):
         computer.uio_in[2].value = (data >> (7 - i)) & 1
         await ClockCycles(sclk, 1)
         await Timer(1)  # <= causes a slight delay, wait for it
 
+async def send_ram_data(computer, sclk):
+    print("PANIC")
+    # await ClockCycles(sclk, 8)
+
+    # pc = 0
+    # for i in range(16):
+    #     pc |= computer.uio_out[1].value.integer << (15 - i)
+    #     await ClockCycles(sclk, 1)
+    #     await Timer(1)  # <= causes a slight delay, wait for it
+
+    # data = ROM[pc]
+    # for i in range(8):
+    #     computer.uio_in[2].value = (data >> (7 - i)) & 1
+    #     await ClockCycles(sclk, 1)
+    #     await Timer(1)  # <= causes a slight delay, wait for it
+
 # Use a seperate stage to force variables and signals to reset.
 @cocotb.test(stage=1)
 async def test_full(dut):
-    computer, clk = await setup(dut)
+    computer, clk, sclk= await setup(dut)
 
     # Only for debugging
     _computer = dut.tt_um_aerox2_jrb8_computer
 
-    print("PC", _computer.pc.value.integer)
-    print("ROM[PC]", _computer.rom.value.integer)
-
-    computer.uio_in[4].value = 1
-    sclk = Clock(computer.uio_in[3], 10, units="us")
-
-		# .a(areg),
-		# .b(c_or_d_reg),
-		# .carryin(cflag),
-		# .oe(aluo),
-		# .cins(cins),
-		# .aluout(aluout),
-		# .overout(overout),
-		# .carryout(carryout),
-		# .cmpo(cmpo)
-
     for _ in range(20):
         print("PC", _computer.pc.value.integer)
         print("ROM[PC]", _computer.rom.value.integer)
-        print("A, B", 
-            _computer.areg.value.integer,
-            _computer.c_or_d_reg.value.integer,
-        )
-        print("ALUOUT, OVEROUT, CARRYOUT", 
-            _computer.aluout.value.integer,
-            _computer.overout.value.integer,
-            _computer.carryout.value.integer,
-        )
-        print("Z O C S", 
-            _computer.zflag.value.integer,
-            _computer.oflag.value.integer,
-            _computer.cflag.value.integer,
-            _computer.sflag.value.integer,
-        )
-        print("test", 
-            _computer.alu_module.sum.value,
-            _computer.alu_module.sum[8].value,
-            _computer.alu_module.carryout.value,
-        )
+        print("INFLAGS", _computer.in_decoder.value)
+        print("OUTFLAGS", _computer.out_decoder.value)
+        print("ROMO", _computer.romo.value)
+        print("PCC", _computer.pcc.value)
+        print("ROMOT", _computer.romot.value)
+        # print("A, B", 
+        #     _computer.areg.value.integer,
+        #     _computer.c_or_d_reg.value.integer,
+        # )
+        # print("ALUOUT, OVEROUT, CARRYOUT", 
+        #     _computer.aluout.value.integer,
+        #     _computer.overout.value.integer,
+        #     _computer.carryout.value.integer,
+        # )
+        # print("Z O C S", 
+        #     _computer.zflag.value.integer,
+        #     _computer.oflag.value.integer,
+        #     _computer.cflag.value.integer,
+        #     _computer.sflag.value.integer,
+        # )
 
         await ClockCycles(clk, 1)
         if (computer.uio_out[0] == 0):
+            print("MOSI", _computer.spi_module.mosi_reg.value)
             await send_rom_data(computer, sclk)
+        if (computer.uio_out[4] == 0):
+            await send_ram_data(computer, sclk)
 
         
 

@@ -7,7 +7,7 @@ if __name__ == "__main__":
     from cocotb_test.simulator import run
     from glob import glob
 
-    sources = glob('../src/*.v')
+    sources = ['tb.v', *glob('../src/*.v')]
 
     run(
         verilog_sources=sources,

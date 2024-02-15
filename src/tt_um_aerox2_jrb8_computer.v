@@ -64,27 +64,38 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	wire [7:0] rom;
 	wire [7:0] ram;
 
-	wire cs_rom;
-	wire cs_ram;
-	wire mosi;
-
-	// SPI Ram for ROM memory
-	assign uio_oe = 8'b00011010;
-
-	wire miso = uio_in[2];
-	wire sclk = uio_in[5] ? uio_in[3] : clk;
+	// Input/output pins
+	assign uio_oe[0] = 1;
+	assign uio_oe[1] = 1;
+	assign uio_oe[2] = 0;
+	assign uio_oe[3] = 0;
+	assign uio_oe[4] = 1;
+	assign uio_oe[5] = 1;
+	assign uio_oe[6] = 1;
+	assign uio_oe[7] = 0;
 
 	assign uio_out[0] = cs_rom;
 	assign uio_out[1] = mosi;
 	assign uio_out[2] = 0;
-	assign uio_out[3] = 0;
+	assign uio_out[3] = sclk;
 	assign uio_out[4] = cs_ram;
 	assign uio_out[5] = 0;
 	assign uio_out[6] = 0;
 	assign uio_out[7] = 0;
 
+	wire cs_rom;
+	wire cs_ram;
+	wire mosi;
+	wire miso = uio_in[2];
+	// wire clk_div_1 = uio_in[5];
+	// wire clk_div_2 = uio_in[6];
+
+	wire sclk;
 	wire executing;
+
+	// SPI Ram for ROM memory
 	spi spi_module(
+		.clk(clk),
 		.rst(rst),
 		.romo(romo),
 		.pc(pc),
@@ -106,9 +117,26 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.miso(miso)
 	);
 
+	// Clock divider
+	reg clk_div;
+	reg [3:0] clk_counter;
+
+	wire [4:0] divisor = 1 << uio_in[6:5];
+	always @(posedge clk, posedge rst)
+	begin
+		if (rst) begin
+			clk_div <= 0;
+			clk_counter <= 0;
+		end else if (clk && executing) begin
+			if(clk_counter>=(divisor-1))
+				clk_counter <= 28'd0;
+			clk_div <= (clk_counter<divisor/2)?1'b1:1'b0;
+		end
+	end
+
 	// Internal registers
 	// A, B, C, D, O, I
-	always @(posedge clk, posedge rst)
+	always @(posedge clk_div, posedge rst)
 	begin
 		if (rst) begin
 			mar <= 0;
@@ -117,7 +145,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 			dreg <= 0;
 			oreg <= 0;
 			ireg <= 0;
-		end else if (clk) begin
+		end else if (clk_div) begin
 			if (mari)
 				mar <= databus;
 			if (ai)
@@ -137,11 +165,11 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
     wire [15:0] pcin;
 	reg [15:0] pc;
 
-	always @(posedge clk, posedge rst)
+	always @(posedge clk_div, posedge rst)
 	begin
 		if (rst)
 			pc <= 0;
-		else if (clk && pcc && executing) begin
+		else if (clk_div && pcc) begin
 			if (pcinflag) 
 				pc <= pcin;
 			else 
@@ -184,7 +212,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.cmpin(databus),
 		.overflow(overout),
 		.carry(carryout),
-		.clk(clk),
+		.clk(clk_div),
 		.rst(rst),
 		.zflag(zflag),
 		.oflag(oflag),
@@ -198,7 +226,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.cins(cins),
 		.pcin(pc),
 		.databus(databus),
-		.clk(clk),
+		.clk(clk_div),
 		.rst(rst),
 		.zflag(zflag),
 		.oflag(oflag),

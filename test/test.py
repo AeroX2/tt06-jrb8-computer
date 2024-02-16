@@ -9,12 +9,12 @@ if __name__ == "__main__":
 
     sources = ['tb.v', *glob('../src/*.v')]
 
-    run(
-        verilog_sources=sources,
-        toplevel="tb",         
-        module="test",   
-        work_dir="../src",
-    )
+    # run(
+    #     verilog_sources=sources,
+    #     toplevel="tb",         
+    #     module="test",   
+    #     work_dir="../src",
+    # )
 
     run(
         verilog_sources=sources,

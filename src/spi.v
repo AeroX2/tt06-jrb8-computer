@@ -41,7 +41,11 @@ module spi (
 
   // Don't move this inside the clk function otherwise due to
   // romo/ramo/rami still being high it will trigger again.
-  always @(posedge romo, posedge ramo, posedge rami) begin
+  always @(
+    posedge romo,
+    posedge ramo,
+    posedge rami
+  ) begin
     // Stop execution of the computer
     executing_reg <= 0;
 
@@ -52,7 +56,10 @@ module spi (
     shift_counter <= 7;
 
     // This needs to set before sclk goes high
-    mosi_reg <= (rami) ? WRITE_COMMAND : READ_COMMAND;
+    if (rami)
+      mosi_reg <= WRITE_COMMAND;
+    else
+      mosi_reg <= READ_COMMAND;
   end
 
   // State transition and control logic
@@ -72,6 +79,7 @@ module spi (
         IDLE: begin
           executing_reg <= 1;
 
+          sclk_reg = 0;
           cs_reg <= 1;
           mosi_reg <= 0;
         end

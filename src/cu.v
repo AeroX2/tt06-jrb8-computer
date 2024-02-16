@@ -33,7 +33,7 @@ module cu(
 		if (rst)
 			cuctr <= 0;
 		else if (clk) 
-			cuctr <= cuctr + 1 >= 2 ? cuctr + 1 : 0;
+			cuctr <= cuctr + 1 <= 2 ? cuctr + 1 : 0;
 	end
 
 	assign iri_out = cuctr == 0;

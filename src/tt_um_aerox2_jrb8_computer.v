@@ -46,21 +46,6 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 
 	wire romo = pcc | romot;
 
-	wire [7:0] cins;
-	wire pcc;
-	wire iri;
-	cu cu_module(
-		.irin(databus),
-		.iri_in(iri),
-		.clk(clk),
-		.rst(rst),
-		.cuout(cins),
-		.inflags(inflags),
-		.outflags(outflags),
-		.pcc(pcc),
-		.iri_out(iri)
-	);
-
 	wire [7:0] rom;
 	wire [7:0] ram;
 
@@ -121,13 +106,14 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	reg clk_div;
 	reg [3:0] clk_counter;
 
-	wire [4:0] divisor = 1 << uio_in[6:5];
+	wire [4:0] divisor = 1 << (uio_in[6:5]+1);
 	always @(posedge clk, posedge rst)
 	begin
 		if (rst) begin
 			clk_div <= 0;
 			clk_counter <= 0;
 		end else if (clk && executing) begin
+			clk_counter <= clk_counter + 28'd1;
 			if(clk_counter>=(divisor-1))
 				clk_counter <= 28'd0;
 			clk_div <= (clk_counter<divisor/2)?1'b1:1'b0;
@@ -183,6 +169,22 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	wire [7:0] ramg = ramo ? ram : 8'h00;
 	wire [7:0] iorg = io ? ireg : 8'h00;
 	assign databus = romg | aluout | iorg;
+
+	// CU
+	wire [7:0] cins;
+	wire pcc;
+	wire iri;
+	cu cu_module(
+		.irin(databus),
+		.iri_in(iri),
+		.clk(clk_div),
+		.rst(rst),
+		.cuout(cins),
+		.inflags(inflags),
+		.outflags(outflags),
+		.pcc(pcc),
+		.iri_out(iri)
+	);
 
 	// ALU
 	wire [7:0] c_or_d_reg = doo ? creg : dreg;

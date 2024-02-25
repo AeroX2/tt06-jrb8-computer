@@ -1,20 +1,18 @@
-<!---
-
-This file is used to generate your project datasheet. Please fill in the information below and delete any unused
-sections.
-
-You can also include images in this folder and reference them in the markdown. Each image must be less than
-512 kb in size, and the combined size of all images must be less than 1 MB.
--->
 
 ## How it works
 
-Explain how your project works
+This is a 8 bit computer I made a long time ago in Logisim Evolution, which I have now decided to port to Tinytapeout and getting manufactured.
+There is a little bit more information about how the CU works and the instructions supported but don't expect much
+https://docs.google.com/document/d/1ZVZw_Kt-KQHER0Wr5ty7JpUEeox_284Mih4rwE16FVM/edit?usp=sharing
 
 ## How to test
 
-Explain how to use your project
+The input pins and the output pins have been assigned respectively to the ui_in and uo_out respectively. As for the uio_in/out that needs to be configured with a SPI RAM and a SPI EEPROM.
+
+The computer should start immediately once the clk starts driving it.
 
 ## External hardware
 
-List external hardware used in your project (e.g. PMOD, LED display, etc), if any
+(check info.yaml for pins)
+- SPI RAM 
+- SPI EEPROM

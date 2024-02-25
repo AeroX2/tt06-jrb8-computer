@@ -32,16 +32,16 @@ async def setup(dut):
 async def test_serial_rom_out(dut):
     spi, clk = await setup(dut)
 
-    pc_value = random.randint(0, 65535)
-    spi.pc.value = pc_value
     await ClockCycles(clk, 100)  # We should be able to wait here forever until ready
     assert spi.state.value == IDLE
     assert spi.cs_rom.value == 1
     assert spi.cs_ram.value == 1
     assert spi.mosi.value == 0
 
-    spi.romo.value = 1
-    await Timer(1)  # `<=` causes a slight delay, wait for it
+    # If PC changes then we should trigger SPI
+    pc_value = random.randint(0, 65535)
+    spi.pc.value = pc_value
+    await ClockCycles(clk, 1)
     assert spi.state.value == SEND_COMMAND
     assert spi.cs_rom.value == 0
     assert spi.cs_ram.value == 1
@@ -92,7 +92,7 @@ async def test_serial_ram_out(dut):
     assert spi.mosi.value == 0
 
     spi.ramo.value = 1
-    await Timer(1)  # `<=` causes a slight delay, wait for it
+    await ClockCycles(clk, 1)
     assert spi.state.value == SEND_COMMAND
     assert spi.cs_rom.value == 1
     assert spi.cs_ram.value == 0
@@ -146,7 +146,7 @@ async def test_serial_ram_in(dut):
     assert spi.mosi.value == 0
 
     spi.rami.value = 1
-    await Timer(1)  # `<=` causes a slight delay, wait for it
+    await ClockCycles(clk, 1)
     assert spi.state.value == SEND_COMMAND
     assert spi.cs_rom.value == 1
     assert spi.cs_ram.value == 0

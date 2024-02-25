@@ -1,7 +1,7 @@
 from test_alu import *
 from test_cmp import *
 from test_jmp import *
-from test_serial import *
+from test_spi import *
 
 if __name__ == "__main__":
     from cocotb_test.simulator import run

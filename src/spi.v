@@ -1,21 +1,21 @@
 module spi (
   input clk,
-  input                   rst,
-  input                   romo,
-  input [15:0]            pc,
-  output [7:0]            rom,
-  input                   rami,
-  input                   ramo,
-  input [15:0]            mar,
-  output [7:0]            ram,
-  input [7:0]             databus,
-  output                  executing,
+  input rst,
+  input romo,
+  input [15:0] pc,
+  output [7:0] rom,
+  input rami,
+  input ramo,
+  input [15:0] mar,
+  output [7:0] ram,
+  input [7:0] databus,
+  output executing,
 
-  output                  sclk,
-  output                  cs_rom,
-  output                  cs_ram,
-  output                  mosi,
-  input                   miso
+  output sclk,
+  output cs_rom,
+  output cs_ram,
+  output mosi,
+  input miso
 );
 
   // Constants
@@ -39,7 +39,6 @@ module spi (
   reg         cs_reg;
   reg [15:0]  mosi_reg;
 
-  reg romo_ped;
   reg ramo_ped;
   reg rami_ped;
   reg [15:0] pc_ped;
@@ -49,12 +48,11 @@ module spi (
     posedge rst
   ) begin
     if (rst) begin
-      romo_ped <= 0;
       ramo_ped <= 0;
       rami_ped <= 0;
       pc_ped <= 0;
     end else begin
-       if (romo && !romo_ped ||
+       if (
         ramo && !ramo_ped ||
         rami && !rami_ped ||
         pc_ped != pc // TODO: Probably a better way of doing this
@@ -75,7 +73,6 @@ module spi (
           mosi_reg <= READ_COMMAND;
       end
 
-      romo_ped <= romo;
       ramo_ped <= ramo;
       rami_ped <= rami;
       pc_ped <= pc;

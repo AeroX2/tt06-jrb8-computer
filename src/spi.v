@@ -39,39 +39,62 @@ module spi (
   reg         cs_reg;
   reg [15:0]  mosi_reg;
 
-  // Don't move this inside the clk function otherwise due to
-  // romo/ramo/rami still being high it will trigger again.
+  reg romo_ped;
+  reg ramo_ped;
+  reg rami_ped;
+  reg [15:0] pc_ped;
+
   always @(
-    posedge romo,
-    posedge ramo,
-    posedge rami
+    negedge clk,
+    posedge rst
   ) begin
-    // Stop execution of the computer
-    executing_reg <= 0;
+    if (rst) begin
+      romo_ped <= 0;
+      ramo_ped <= 0;
+      rami_ped <= 0;
+      pc_ped <= 0;
+    end else begin
+       if (romo && !romo_ped ||
+        ramo && !ramo_ped ||
+        rami && !rami_ped ||
+        pc_ped != pc // TODO: Probably a better way of doing this
+      ) begin
+        // Stop execution of the computer
+        executing_reg <= 0;
 
-    state <= SEND_COMMAND;
+        state <= SEND_COMMAND;
 
-    sclk_reg <= 0;
-    cs_reg <= 0;
-    shift_counter <= 7;
+        sclk_reg <= 0;
+        cs_reg <= 0;
+        shift_counter <= 7;
 
-    // This needs to set before sclk goes high
-    if (rami)
-      mosi_reg <= WRITE_COMMAND;
-    else
-      mosi_reg <= READ_COMMAND;
+        // This needs to set before sclk goes high
+        if (rami)
+          mosi_reg <= WRITE_COMMAND;
+        else
+          mosi_reg <= READ_COMMAND;
+      end
+
+      romo_ped <= romo;
+      ramo_ped <= ramo;
+      rami_ped <= rami;
+      pc_ped <= pc;
+    end
   end
 
   // State transition and control logic
-  always @(posedge clk, posedge rst) begin
+  always @(
+    posedge clk,
+    posedge rst
+  ) begin
     if (rst) begin
       state <= IDLE;
 
       data_reg <= 0;
-      executing_reg <= 1;
+      executing_reg <= 0;
       shift_counter <= 0;
 
-      sclk_reg = 0;
+      sclk_reg <= 0;
       cs_reg <= 1;
       mosi_reg <= 0;
     end else if (clk) begin
@@ -79,7 +102,7 @@ module spi (
         IDLE: begin
           executing_reg <= 1;
 
-          sclk_reg = 0;
+          sclk_reg <= 0;
           cs_reg <= 1;
           mosi_reg <= 0;
         end

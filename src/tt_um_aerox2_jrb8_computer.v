@@ -72,8 +72,6 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	wire cs_ram;
 	wire mosi;
 	wire miso = uio_in[2];
-	// wire clk_div_1 = uio_in[5];
-	// wire clk_div_2 = uio_in[6];
 
 	wire sclk;
 	wire executing;
@@ -173,21 +171,18 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	// CU
 	wire [7:0] cins;
 	wire pcc;
-	wire iri;
 	cu cu_module(
 		.irin(databus),
-		.iri_in(iri),
 		.clk(clk_div),
 		.rst(rst),
 		.cuout(cins),
 		.inflags(inflags),
 		.outflags(outflags),
-		.pcc(pcc),
-		.iri_out(iri)
+		.pcc(pcc)
 	);
 
 	// ALU
-	wire [7:0] c_or_d_reg = doo ? creg : dreg;
+	wire [7:0] c_or_d_reg = doo ? dreg : creg;
 	wire aluo = ao | co | doo;
 
 	wire overout;

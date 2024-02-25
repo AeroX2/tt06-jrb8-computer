@@ -1,12 +1,10 @@
 module cu(
 	input [7:0] irin,
-	input iri_in,
 	input clk,
 	input rst,
 	output [4:0] inflags,
 	output [3:0] outflags,
 	output pcc,
-	output iri_out,
 	output [7:0] cuout
 );
 	// TODO: Check if roms are actually getting read
@@ -18,25 +16,24 @@ module cu(
 	end
 
 	reg [7:0] ir_reg;
+	wire ir_en = cuctr == 0;
 	always @(posedge clk, posedge rst)
 	begin
 		if (rst)
 			ir_reg <= 8'h00;
-		else if (clk && iri_in)
+		else if (clk && ir_en)
 			ir_reg <= irin;
 	end
 	assign cuout = ir_reg;
 
 	reg [2:0] cuctr;
-	always @(posedge clk, posedge rst)
+	always @(negedge clk, posedge rst)
 	begin
 		if (rst)
 			cuctr <= 0;
-		else if (clk) 
+		else
 			cuctr <= cuctr + 1 <= 2 ? cuctr + 1 : 0;
 	end
-
-	assign iri_out = cuctr == 0;
 
 	wire [7:0] val = cu_rom[ir_reg];
 	wire [7:0] val2 = cu_rom_2[ir_reg];
@@ -44,5 +41,5 @@ module cu(
 	wire [7:0] fin = (cuctr == 1 ? val : 8'h00) | (cuctr == 2 ? val2 : 8'h00);
 	assign inflags = fin[3:0];
 	assign outflags = fin[6:4];
-	assign pcc = iri_out | fin[7];
+	assign pcc = fin[7] | ir_en;
 endmodule

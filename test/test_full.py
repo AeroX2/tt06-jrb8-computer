@@ -58,9 +58,6 @@ async def send_rom_data(computer, sclk, _computer):
         await FallingEdge(sclk)
         computer.uio_in[2].value = (data >> (7 - i)) & 1
 
-    # TODO: Hmmm....
-    await RisingEdge(_computer.spi_module.executing)
-
 async def send_ram_data(computer, sclk):
     raise Exception("PANIC")
     # await ClockCycles(sclk, 8)

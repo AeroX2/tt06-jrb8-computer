@@ -5,12 +5,12 @@ module cmp(
 	input carry,
 	input clk,
 	input rst,
-	output reg zflag,
-	output reg oflag,
-	output reg cflag,
-	output reg sflag
+	output logic zflag,
+	output logic oflag,
+	output logic cflag,
+	output logic sflag
 );
-	always @(posedge clk, posedge rst)
+	always_ff @(posedge clk, posedge rst)
 	begin
 		if (rst) begin
 			zflag <= 0;

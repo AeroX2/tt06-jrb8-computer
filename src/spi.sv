@@ -1,20 +1,26 @@
 module spi (
   input clk,
   input rst,
+
+  // ROM
   input romo,
   input [15:0] pc,
-  output [7:0] rom,
+  output logic [7:0] rom,
+
+  // RAM
   input rami,
   input ramo,
   input [15:0] mar,
-  output [7:0] ram,
-  input [7:0] databus,
-  output executing,
+  output logic [7:0] ram,
 
-  output sclk,
-  output cs_rom,
-  output cs_ram,
-  output mosi,
+  input [7:0] databus,
+  output logic executing,
+
+  // SPI
+  output logic sclk,
+  output logic cs_rom,
+  output logic cs_ram,
+  output logic mosi,
   input miso
 );
 
@@ -39,48 +45,37 @@ module spi (
   reg         cs_reg;
   reg [15:0]  mosi_reg;
 
-  reg ramo_ped;
-  reg rami_ped;
-  reg [15:0] pc_ped;
+  reg begin_transaction;
 
-  always @(
+  // Positive edge detectors
+  // reg romo_ped;
+  logic [15:0] pc_pre;
+  logic [15:0] mar_pre;
+
+  always_ff @(
     negedge clk,
     posedge rst
   ) begin
     if (rst) begin
-      ramo_ped <= 0;
-      rami_ped <= 0;
-      pc_ped <= 0;
+      pc_pre <= -1;
+      mar_pre <= -1;
+      begin_transaction <= 0;
     end else begin
-       if (
-        ramo && !ramo_ped ||
-        rami && !rami_ped ||
-        pc_ped != pc // TODO: Probably a better way of doing this
+      begin_transaction <= 0;
+
+      if (
+        (pc != pc_pre) && romo ||
+        (mar != mar_pre) && (rami || ramo)
       ) begin
-        // Stop execution of the computer
-        executing_reg <= 0;
-
-        state <= SEND_COMMAND;
-
-        sclk_reg <= 0;
-        cs_reg <= 0;
-        shift_counter <= 7;
-
-        // This needs to set before sclk goes high
-        if (rami)
-          mosi_reg <= WRITE_COMMAND;
-        else
-          mosi_reg <= READ_COMMAND;
+        pc_pre <= pc;
+        mar_pre <= mar;
+        begin_transaction <= 1;
       end
-
-      ramo_ped <= ramo;
-      rami_ped <= rami;
-      pc_ped <= pc;
     end
   end
 
   // State transition and control logic
-  always @(
+  always_ff @(
     posedge clk,
     posedge rst
   ) begin
@@ -97,11 +92,26 @@ module spi (
     end else if (clk) begin
       case (state)
         IDLE: begin
-          executing_reg <= 1;
-
           sclk_reg <= 0;
           cs_reg <= 1;
           mosi_reg <= 0;
+
+          if (begin_transaction) begin
+            // Stop execution of the computer
+            executing_reg <= 0;
+
+            state <= SEND_COMMAND;
+
+            sclk_reg <= 0;
+            cs_reg <= 0;
+            shift_counter <= 7;
+
+            // This needs to set before sclk goes high
+            if (rami)
+              mosi_reg <= WRITE_COMMAND;
+            else
+              mosi_reg <= READ_COMMAND;
+          end
         end
         SEND_COMMAND: begin
           sclk_reg <= ~sclk_reg;
@@ -141,26 +151,40 @@ module spi (
           if (sclk_reg) begin
             shift_counter <= shift_counter - 1;
             data_reg[shift_counter] <= miso;
-            if (shift_counter == 0)
+            if (shift_counter == 0) begin
               state <= IDLE;
+              executing_reg <= 1;
+            end
           end
         end
       endcase
     end
   end
 
-  // Output assignments
-  assign executing = executing_reg;
-  assign rom = (romo) ? data_reg : 8'b0;
-  assign ram = (ramo && !romo) ? data_reg : 8'b0;
+  always_comb begin
+    executing = executing_reg;
+    sclk = sclk_reg;
 
-  assign sclk = sclk_reg;
-  assign cs_rom = (romo) ? cs_reg : 1'b1;
-  assign cs_ram = ((rami || ramo) && !romo) ? cs_reg : 1'b1;
+    rom = (romo) ? data_reg : 8'b0;
+    ram = (ramo && !romo) ? data_reg : 8'b0;
 
-  assign mosi = (state == SEND_COMMAND || 
-                 state == SEND_ADDRESS || 
-                 state == SEND_DATA)
-                ? mosi_reg[shift_counter] : 0;
+    cs_rom = 1;
+    cs_ram = 1;
+    if (state == SEND_COMMAND) begin
+      if (romo)
+        cs_rom = cs_reg;
+      
+      if (rami || ramo)
+        cs_ram = cs_reg;
+    end
 
+    case (state)
+      SEND_COMMAND,
+      SEND_ADDRESS,
+      SEND_DATA:
+        mosi = mosi_reg[shift_counter];
+      default:
+        mosi = 0;
+    endcase
+  end
 endmodule

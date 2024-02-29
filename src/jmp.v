@@ -2,6 +2,7 @@ module jmp(
 	input [7:0] cins,
 	input [7:0] databus,
 	input [15:0] pcin,
+	input pcc,
 	input clk,
 	input rst,
 	input zflag,
@@ -38,11 +39,10 @@ module jmp(
 	assign pcoe = oe ? flags[sel] : 0;
 
 	reg [7:0] highbits;
-	always @(posedge clk, posedge rst)
-	begin
+	always @(posedge clk, posedge rst) begin
 		if (rst)
 			highbits <= 8'h00;
-		else if (clk)
+		else if (pcc)
 			highbits <= databus;
 	end
 

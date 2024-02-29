@@ -10,16 +10,14 @@ module cmp(
 	output logic cflag,
 	output logic sflag
 );
-	always_ff @(posedge clk, posedge rst)
-	begin
+	always_ff @(posedge clk, posedge rst) begin
 		if (rst) begin
 			zflag <= 0;
 			oflag <= 0;
 			cflag <= 0;
 			sflag <= 0;
-		end
-		else if (we) begin
-			zflag <= cmpin[6:0] == 0;
+		end else if (we) begin
+			zflag <= cmpin == 0;
 			oflag <= overflow;
 			cflag <= carry;
 			sflag <= cmpin[7];

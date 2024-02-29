@@ -51,5 +51,5 @@ module alu(
 
 	assign aluout = oe ? out1 : 0;
 	assign carryout = sum[8];
-	assign overout = ((~out1[7]) & a[7] & b[7]) | (out1[7] & ~a[7] & ~b[7]);
+	assign overout = ((~out1[7]) & xora[7] & xorb[7]) | (out1[7] & ~xora[7] & ~xorb[7]);
 endmodule

@@ -20,6 +20,120 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	reg [7:0] oreg;
 	reg [7:0] ireg;
 
+	wire [7:0] rom;
+	wire [7:0] ram;
+
+	// Input/output pins
+	assign uio_oe[0] = 1;
+	assign uio_oe[1] = 1;
+	assign uio_oe[2] = 0;
+	assign uio_oe[3] = 0;
+	assign uio_oe[4] = 1;
+	assign uio_oe[5] = 1;
+	assign uio_oe[6] = 1;
+	assign uio_oe[7] = 0;
+
+	assign uio_out[0] = cs_rom;
+	assign uio_out[1] = mosi;
+	assign uio_out[2] = 0;
+	assign uio_out[3] = sclk;
+	assign uio_out[4] = cs_ram;
+	assign uio_out[5] = 0;
+	assign uio_out[6] = 0;
+	assign uio_out[7] = 0;
+
+	wire cs;
+	wire cs_rom = romo ? cs : 1;
+	wire cs_ram = (ramil || ramo) ? cs : 1;
+
+	wire mosi;
+	wire miso = uio_in[2];
+	wire sclk;
+
+	// Internal registers
+	// A, B, C, D, O, I
+	always @(posedge clk, posedge rst) begin
+		if (rst) begin
+			mar <= 0;
+			areg <= 0;
+			creg <= 0;
+			dreg <= 0;
+			oreg <= 0;
+			ireg <= 0;
+		end else if (clk) begin
+			if (mari)
+				mar <= databus;
+			if (ai)
+				areg <= databus;
+			if (ci)
+				creg <= databus;
+			if (di)
+				dreg <= databus;
+			if (oi)
+				oreg <= databus;
+			ireg <= ui_in;
+		end
+	end
+	assign uo_out = oreg;
+
+
+	// Databus
+	wire [7:0] aluout;
+	wire [7:0] rom_or_ram = (romo || ramo) ? spi_data : 8'h00;
+	wire [7:0] iorg = io ? ireg : 8'h00;
+	assign databus = rom_or_ram | aluout | iorg;
+
+	wire [7:0] spi_data;
+	wire spi_executing;
+	wire spi_done;
+	// SPI Ram for ROM memory
+	spi spi_module(
+		.clk(clk),
+		.rst(rst),
+
+		.databus(databus),
+
+		.start(spi_executing),
+		.done(spi_done),
+		.write(ramil),
+		.address(romo ? pc : mar),
+		.data(spi_data),
+
+		.sclk(sclk),
+		.cs(cs),
+		.mosi(mosi),
+		.miso(miso)
+	);
+
+    wire pcinflag;
+	wire pcc;
+	wire pcc2;
+	wire [15:0] pc;
+    wire [15:0] pcin;
+
+	// CU
+	wire [7:0] cins;
+	cu cu_module(
+		.clk(clk),
+		.rst(rst),
+		.halt(halt),
+		
+		.spi_executing(spi_executing),
+		.spi_done(spi_done),
+
+		.irin(databus),
+
+		.pcinflag(pcinflag),
+		.pcin(pcin),
+		.pc(pc),
+		.pcco(pcc),
+		.pcco2(pcc2),
+		
+		.inflags(inflags),
+		.outflags(outflags),
+		.cuout(cins)
+	);
+
 	// CU decoding the instruction
 	wire [4:0] inflags;
 	wire [3:0] outflags;
@@ -44,142 +158,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	wire ramo = out_decoder[6];
 	wire jmpo = out_decoder[7];
 
-	wire romo = pcc | romot;
-
-	wire [7:0] rom;
-	wire [7:0] ram;
-
-	// Input/output pins
-	assign uio_oe[0] = 1;
-	assign uio_oe[1] = 1;
-	assign uio_oe[2] = 0;
-	assign uio_oe[3] = 0;
-	assign uio_oe[4] = 1;
-	assign uio_oe[5] = 1;
-	assign uio_oe[6] = 1;
-	assign uio_oe[7] = 0;
-
-	assign uio_out[0] = cs_rom;
-	assign uio_out[1] = mosi;
-	assign uio_out[2] = 0;
-	assign uio_out[3] = sclk;
-	assign uio_out[4] = cs_ram;
-	assign uio_out[5] = 0;
-	assign uio_out[6] = 0;
-	assign uio_out[7] = 0;
-
-	wire cs_rom;
-	wire cs_ram;
-	wire mosi;
-	wire miso = uio_in[2];
-
-	wire sclk;
-	wire executing;
-
-	// SPI Ram for ROM memory
-	spi spi_module(
-		.clk(clk),
-		.rst(rst),
-		.romo(romo),
-		.pc(pc),
-		.rom(rom),
-
-		.rami(ramil),
-		.ramo(ramo),
-		.mar({ 8'h0, mar }),
-		.ram(ram),
-
-		.databus(databus),
-
-		.executing(executing),
-
-		.sclk(sclk),
-		.cs_rom(cs_rom),
-		.cs_ram(cs_ram),
-		.mosi(mosi),
-		.miso(miso)
-	);
-
-	// Clock divider
-	reg clk_div;
-	reg [3:0] clk_counter;
-
-	wire [4:0] divisor = 1 << (uio_in[6:5]+1);
-	always @(posedge clk, posedge rst)
-	begin
-		if (rst) begin
-			clk_div <= 0;
-			clk_counter <= 0;
-		end else if (clk && executing) begin
-			clk_counter <= clk_counter + 28'd1;
-			if(clk_counter>=(divisor-1))
-				clk_counter <= 28'd0;
-			clk_div <= (clk_counter<divisor/2)?1'b1:1'b0;
-		end
-	end
-
-	// Internal registers
-	// A, B, C, D, O, I
-	always @(posedge clk_div, posedge rst)
-	begin
-		if (rst) begin
-			mar <= 0;
-			areg <= 0;
-			creg <= 0;
-			dreg <= 0;
-			oreg <= 0;
-			ireg <= 0;
-		end else if (clk_div) begin
-			if (mari)
-				mar <= databus;
-			if (ai)
-				areg <= databus;
-			if (ci)
-				creg <= databus;
-			if (di)
-				creg <= databus;
-			if (oi)
-				oreg <= databus;
-			ireg <= ui_in;
-		end
-	end
-	assign uo_out = oreg;
-
-    wire pcinflag;
-    wire [15:0] pcin;
-	reg [15:0] pc;
-
-	always @(posedge clk_div, posedge rst)
-	begin
-		if (rst)
-			pc <= 0;
-		else if (clk_div && pcc) begin
-			if (pcinflag) 
-				pc <= pcin;
-			else 
-				pc <= pc + 1;
-		end
-	end
-
-	// Databus
-	wire [7:0] aluout;
-	wire [7:0] romg = romo ? rom : 8'h00;
-	wire [7:0] ramg = ramo ? ram : 8'h00;
-	wire [7:0] iorg = io ? ireg : 8'h00;
-	assign databus = romg | aluout | iorg;
-
-	// CU
-	wire [7:0] cins;
-	wire pcc;
-	cu cu_module(
-		.irin(databus),
-		.clk(clk_div),
-		.rst(rst),
-		.cuout(cins),
-		.inflags(inflags),
-		.outflags(outflags),
-		.pcc(pcc)
-	);
+	wire romo = romot || pcc;
 
 	// ALU
 	wire [7:0] c_or_d_reg = doo ? dreg : creg;
@@ -209,7 +188,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.cmpin(databus),
 		.overflow(overout),
 		.carry(carryout),
-		.clk(clk_div),
+		.clk(clk),
 		.rst(rst),
 		.zflag(zflag),
 		.oflag(oflag),
@@ -222,8 +201,9 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	jmp jmp_module(
 		.cins(cins),
 		.pcin(pc),
+		.pcc(pcc2),
 		.databus(databus),
-		.clk(clk_div),
+		.clk(clk),
 		.rst(rst),
 		.zflag(zflag),
 		.oflag(oflag),

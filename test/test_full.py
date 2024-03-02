@@ -11,7 +11,7 @@ ROM_JMP_EXAMPLE = [
 ]
 
 ROM_DIVISION_EXAMPLE = [
-    0x70, 0x35, 0x71, 0x07, 0x72, 0x00, 0x5e, 0x37, 0x00, 0x12, 0x15, 0x5a, 0x13, 0x71, 0x07, 0x30, 0x00, 0x06, 0x15, 0x5a, 0x13, 0xf0, 
+    0x70, 0x35, 0x71, 0x07, 0x72, 0x00, 0x5e, 0x37, 0x00, 0x12, 0x15, 0x5a, 0x13, 0x71, 0x07, 0x30, 0x00, 0x06, 0x5d, 0xf0, 
 ]
 
 ROM_RAM_EXAMPLE = [
@@ -78,7 +78,7 @@ async def send_rom_data(computer, sclk, ROM):
         await RisingEdge(sclk)
         pc |= computer.uio_out[1].value.integer << (15 - i)
 
-    print("Reading ROM from", pc)
+    # print("Reading ROM from", pc)
 
     data = ROM[pc]
     for i in range(8):
@@ -147,7 +147,7 @@ async def test_add_example(dut):
 
 @cocotb.test()
 async def test_jmp_example(dut):
-    await run(dut, ROM_JMP_EXAMPLE, 100)
+    await run(dut, ROM_JMP_EXAMPLE, 200)
     assert dut.tt_um_aerox2_jrb8_computer.areg.value == 6
 
 @cocotb.test()
@@ -156,19 +156,19 @@ async def test_division_example(dut):
     assert dut.tt_um_aerox2_jrb8_computer.areg.value == 4
     assert dut.tt_um_aerox2_jrb8_computer.creg.value == 7
 
-# @cocotb.test()
-# async def test_ram_example(dut):
-#     await run(dut, ROM_RAM_EXAMPLE, 100)
-#     print(RAM[:70])
-#     assert RAM[21] == 12
-#     assert RAM[43] == 34
-#     assert RAM[65] == 56
-#     assert dut.tt_um_aerox2_jrb8_computer.breg.value == 34
-#     assert dut.tt_um_aerox2_jrb8_computer.creg.value == 56
+@cocotb.test()
+async def test_ram_example(dut):
+    await run(dut, ROM_RAM_EXAMPLE, 100)
+    assert RAM[21] == 12
+    assert RAM[43] == 34
+    assert RAM[65] == 56
+    assert dut.tt_um_aerox2_jrb8_computer.breg.value == 34
+    assert dut.tt_um_aerox2_jrb8_computer.creg.value == 56
 
-# @cocotb.test()
-# async def test_fibonacci_example(dut):
-#     await run(dut, ROM_FIBONACCI_EXAMPLE)
+@cocotb.test()
+async def test_fibonacci_example(dut):
+    await run(dut, ROM_FIBONACCI_EXAMPLE, 500)
+    assert dut.tt_um_aerox2_jrb8_computer.areg.value == 55
 
 # @cocotb.test()
 # async def test_primes_example(dut):

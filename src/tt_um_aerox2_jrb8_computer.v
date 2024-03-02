@@ -41,14 +41,6 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	assign uio_out[6] = 0;
 	assign uio_out[7] = 0;
 
-	wire cs;
-	wire cs_rom = romo ? cs : 1;
-	wire cs_ram = (ramil || ramo) ? cs : 1;
-
-	wire mosi;
-	wire miso = uio_in[2];
-	wire sclk;
-
 	// Internal registers
 	// A, B, C, D, O, I
 	always @(posedge clk, posedge rst) begin
@@ -59,7 +51,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 			creg <= 0;
 			oreg <= 0;
 			ireg <= 0;
-		end else if (clk && en) begin
+		end else if (clk) begin
 			if (mari)
 				mar <= databus;
 			if (ai)
@@ -75,6 +67,16 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	end
 	assign uo_out = oreg;
 
+	// TODO: This seems a little unclean.
+	wire raw_ramil = inflags == 2;
+
+	wire cs;
+	wire cs_rom = romo ? cs : 1;
+	wire cs_ram = (raw_ramil || ramo) ? cs : 1;
+
+	wire mosi;
+	wire miso = uio_in[2];
+	wire sclk;
 
 	wire [7:0] spi_data;
 	wire spi_executing;
@@ -88,7 +90,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 
 		.start(spi_executing),
 		.done(spi_done),
-		.write(ramil),
+		.write(raw_ramil),
 		.address(romo ? pc : mar),
 		.data(spi_data),
 
@@ -129,7 +131,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	wire [4:0] inflags;
 	wire [3:0] outflags;
 
-	wire [15:0] in_decoder = 8'b0000_0001 << inflags;
+	wire [15:0] in_decoder = 8'b0000_0001 << (en ? inflags : 16'h00);
 	wire [7:0] out_decoder = 8'b0000_0001 << outflags;
 
 	wire oi = in_decoder[1];

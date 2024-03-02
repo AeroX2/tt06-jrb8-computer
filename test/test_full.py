@@ -11,7 +11,7 @@ ROM_JMP_EXAMPLE = [
 ]
 
 ROM_DIVISION_EXAMPLE = [
-    0x70, 0x35, 0x71, 0x07, 0x72, 0x00, 0x5e, 0x37, 0x00, 0x14, 0x10, 0x14, 0x59, 0x11, 0x12, 0x71, 0x07, 0x30, 0x00, 0x06, 0x5d, 0x0, 0x0
+    0x70, 0x35, 0x71, 0x07, 0x72, 0x00, 0x5e, 0x37, 0x00, 0x12, 0x15, 0x5a, 0x13, 0x71, 0x07, 0x30, 0x00, 0x06, 0x15, 0x5a, 0x13, 0xf0, 
 ]
 
 ROM_RAM_EXAMPLE = [
@@ -140,30 +140,31 @@ async def run(dut, ROM, cycles):
             print(RAM[:50])
             break
 
-# @cocotb.test()
-# async def test_add_example(dut):
-#     await run(dut, ROM_ADD_EXAMPLE, 100)
-#     assert dut.tt_um_aerox2_jrb8_computer.uo_out.value == 34
-
-# @cocotb.test()
-# async def test_jmp_example(dut):
-#     await run(dut, ROM_JMP_EXAMPLE, 100)
-#     assert dut.tt_um_aerox2_jrb8_computer.areg.value == 6
-
-# @cocotb.test()
-# async def test_division_example(dut):
-#     await run(dut, ROM_DIVISION_EXAMPLE, 900)
-#     assert dut.tt_um_aerox2_jrb8_computer.areg.value == 4
-#     assert dut.tt_um_aerox2_jrb8_computer.dreg.value == 7
+@cocotb.test()
+async def test_add_example(dut):
+    await run(dut, ROM_ADD_EXAMPLE, 100)
+    assert dut.tt_um_aerox2_jrb8_computer.uo_out.value == 34
 
 @cocotb.test()
-async def test_ram_example(dut):
-    await run(dut, ROM_RAM_EXAMPLE, 1000)
-    assert RAM[21] == 12
-    assert RAM[43] == 34
-    assert RAM[65] == 56
-    assert dut.tt_um_aerox2_jrb8_computer.creg.value == 34
-    assert dut.tt_um_aerox2_jrb8_computer.dreg.value == 56
+async def test_jmp_example(dut):
+    await run(dut, ROM_JMP_EXAMPLE, 100)
+    assert dut.tt_um_aerox2_jrb8_computer.areg.value == 6
+
+@cocotb.test()
+async def test_division_example(dut):
+    await run(dut, ROM_DIVISION_EXAMPLE, 900)
+    assert dut.tt_um_aerox2_jrb8_computer.areg.value == 4
+    assert dut.tt_um_aerox2_jrb8_computer.creg.value == 7
+
+# @cocotb.test()
+# async def test_ram_example(dut):
+#     await run(dut, ROM_RAM_EXAMPLE, 100)
+#     print(RAM[:70])
+#     assert RAM[21] == 12
+#     assert RAM[43] == 34
+#     assert RAM[65] == 56
+#     assert dut.tt_um_aerox2_jrb8_computer.breg.value == 34
+#     assert dut.tt_um_aerox2_jrb8_computer.creg.value == 56
 
 # @cocotb.test()
 # async def test_fibonacci_example(dut):

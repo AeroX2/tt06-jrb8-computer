@@ -11,12 +11,11 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
     input  wire       rst_n     // reset_n - low to reset
 );
 	wire rst = !rst_n;
-	wire [7:0] databus;	
 
 	reg [7:0] mar;
 	reg [7:0] areg;
+	reg [7:0] breg;
 	reg [7:0] creg;
-	reg [7:0] dreg;
 	reg [7:0] oreg;
 	reg [7:0] ireg;
 
@@ -56,19 +55,19 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		if (rst) begin
 			mar <= 0;
 			areg <= 0;
+			breg <= 0;
 			creg <= 0;
-			dreg <= 0;
 			oreg <= 0;
 			ireg <= 0;
-		end else if (clk) begin
+		end else if (clk && en) begin
 			if (mari)
 				mar <= databus;
 			if (ai)
 				areg <= databus;
+			if (bi)
+				breg <= databus;
 			if (ci)
 				creg <= databus;
-			if (di)
-				dreg <= databus;
 			if (oi)
 				oreg <= databus;
 			ireg <= ui_in;
@@ -76,12 +75,6 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	end
 	assign uo_out = oreg;
 
-
-	// Databus
-	wire [7:0] aluout;
-	wire [7:0] rom_or_ram = (romo || ramo) ? spi_data : 8'h00;
-	wire [7:0] iorg = io ? ireg : 8'h00;
-	assign databus = rom_or_ram | aluout | iorg;
 
 	wire [7:0] spi_data;
 	wire spi_executing;
@@ -105,9 +98,8 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.miso(miso)
 	);
 
+	wire en;
     wire pcinflag;
-	wire pcc;
-	wire pcc2;
 	wire [15:0] pc;
     wire [15:0] pcin;
 
@@ -117,6 +109,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.clk(clk),
 		.rst(rst),
 		.halt(halt),
+		.en(en),
 		
 		.spi_executing(spi_executing),
 		.spi_done(spi_done),
@@ -126,8 +119,6 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.pcinflag(pcinflag),
 		.pcin(pcin),
 		.pc(pc),
-		.pcco(pcc),
-		.pcco2(pcc2),
 		
 		.inflags(inflags),
 		.outflags(outflags),
@@ -145,31 +136,34 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	wire ramil = in_decoder[2];
 	wire mari = in_decoder[3];
 	wire ai = in_decoder[4];
-	wire ci = in_decoder[5];
-	wire di = in_decoder[6];
+	wire bi = in_decoder[5];
+	wire ci = in_decoder[6];
+	wire jmpi = in_decoder[7];
 	// wire ramih = in_decoder[7];
 	wire halt = in_decoder[15];
 
 	wire io = out_decoder[1];
 	wire ao = out_decoder[2];
-	wire co = out_decoder[3];
-	wire doo = out_decoder[4];
-	wire romot = out_decoder[5];
+	wire bo = out_decoder[3];
+	wire co = out_decoder[4];
+	wire romo = out_decoder[5];
 	wire ramo = out_decoder[6];
-	wire jmpo = out_decoder[7];
 
-	wire romo = romot || pcc;
+	// Databus
+	wire [7:0] aluout;
+	wire [7:0] rom_or_ram = (romo || ramo) ? spi_data : 8'h00;
+	wire [7:0] iorg = io ? ireg : 8'h00;
+	wire [7:0] corg = co ? creg : 8'h00;
+	wire [7:0] databus = rom_or_ram | aluout | iorg | corg;
 
 	// ALU
-	wire [7:0] c_or_d_reg = doo ? dreg : creg;
-	wire aluo = ao | co | doo;
-
+	wire aluo = ao | bo;
 	wire overout;
 	wire carryout;
 	wire cmpo;
 	alu alu_module(
 		.a(areg),
-		.b(c_or_d_reg),
+		.b(breg),
 		.carryin(cflag),
 		.oe(aluo),
 		.cins(cins),
@@ -201,7 +195,6 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	jmp jmp_module(
 		.cins(cins),
 		.pcin(pc),
-		.pcc(pcc2),
 		.databus(databus),
 		.clk(clk),
 		.rst(rst),
@@ -211,6 +204,6 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.sflag(sflag),
 		.pcoe(pcinflag),
 		.pcout(pcin),
-		.oe(jmpo)
+		.oe(jmpi)
 	);
 endmodule

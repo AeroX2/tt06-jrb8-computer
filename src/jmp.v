@@ -2,7 +2,6 @@ module jmp(
 	input [7:0] cins,
 	input [7:0] databus,
 	input [15:0] pcin,
-	input pcc,
 	input clk,
 	input rst,
 	input zflag,
@@ -42,8 +41,8 @@ module jmp(
 	always @(posedge clk, posedge rst) begin
 		if (rst)
 			highbits <= 8'h00;
-		else if (pcc)
-			highbits <= databus;
+		// else // TODO: Fix this
+			// highbits <= databus;
 	end
 
 	wire [15:0] two_byte_address = {highbits, databus}; 

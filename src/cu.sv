@@ -10,9 +10,8 @@ module cu(
 
 	input pcinflag,
 	input [15:0] pcin,
-	output logic pcco,
-	output logic pcco2,
 	output logic [15:0] pc,
+	output logic en,
 
 	output logic [4:0] inflags,
 	output logic [3:0] outflags,
@@ -26,21 +25,8 @@ module cu(
 		$readmemh("../rom/cu_rom_2.mem", cu_rom_2);
 	end
 
-	logic pcc;
 	logic [15:0] pc_reg;
-	always_ff @(posedge clk, posedge rst) begin
-		if (rst) begin
-			pcc <= 0;
-			pc_reg <= 0;
-		end else if (clk) begin
-			if (pcc) begin
-				if (pcinflag) 
-					pc_reg <= pcin;
-				else 
-					pc_reg <= pc_reg + 1;
-			end
-		end
-	end
+	wire pcc = fin[7];
 
 	// States
 	localparam  UPDATE_SPI   = 0,
@@ -57,37 +43,39 @@ module cu(
 	always_ff @(negedge clk, posedge rst) begin
 		if (rst) begin
 			fin <= 0;
+			pc_reg <= 0;
 			ir_reg <= 0;
 			cu_state <= 0;
 			spi_executing <= 0;
 		end else if (!halt) begin
 			case (cu_state)
 				UPDATE_SPI: begin
-					pcc <= 0;
-					fin <= 7'h50;
+					fin <= 8'h50;
 					spi_executing <= 1;
 					if (spi_done) begin
-						ir_reg <= irin;
 						spi_executing <= 0;
 						cu_state <= UPDATE_IR;
 					end
 				end
 				UPDATE_IR: begin
 					fin <= 0;
+					ir_reg <= irin;
 					cu_state <= FLAGS_1;
 				end
 				FLAGS_1: begin
 					fin <= cu_rom[ir_reg];
-					pcc <= cu_rom[ir_reg][7];
-					if (cu_rom[ir_reg][7]) begin
+					if (cu_rom[ir_reg][7] || inflags == 1 || outflags == 5 || cu_rom[ir_reg][6:4] == 6) begin
 						spi_executing <= 1;
 						cu_state <= UPDATE_SPI_2;
 					end else begin
 						cu_state <= FLAGS_2;
 					end
+
+					if (cu_rom[ir_reg][7]) begin
+						pc_reg <= pc_reg + 1;
+					end
 				end
 				UPDATE_SPI_2: begin
-					pcc <= 0;
 					if (spi_done) begin
 						spi_executing <= 0;
 						cu_state <= FLAGS_2;
@@ -95,36 +83,39 @@ module cu(
 				end
 				FLAGS_2: begin
 					fin <= cu_rom_2[ir_reg];
-					pcc <= cu_rom_2[ir_reg][7];
-					if (cu_rom_2[ir_reg][7]) begin
+					if (cu_rom_2[ir_reg][7] || inflags == 1 || outflags == 5 || cu_rom_2[ir_reg][6:4] == 6) begin
 						spi_executing <= 1;
 						cu_state <= UPDATE_SPI_3;
 					end else begin
 						cu_state <= UPDATE_PC;
 					end
+
+					if (cu_rom_2[ir_reg][7]) begin
+						pc_reg <= pc_reg + 1;
+					end
 				end
 				UPDATE_SPI_3: begin
-					pcc <= 0;
 					if (spi_done) begin
 						spi_executing <= 0;
 						cu_state <= UPDATE_PC;
 					end
 				end
 				UPDATE_PC: begin
-					// fin <= 0;
-					pcc <= 1;
+					if (pcinflag) begin
+						pc_reg <= pcin;
+					end else begin
+						pc_reg <= pc_reg + 1;
+					end
+
 					cu_state <= UPDATE_SPI;
 				end
 			endcase
 		end
 	end
 
-	wire en = cu_state == FLAGS_1 || cu_state == FLAGS_2 || cu_state == UPDATE_SPI;
-
 	assign pc = pc_reg;
-	assign pcco2 = pcc;
-	assign pcco = fin[7];
-	assign inflags = en ? fin[3:0] : 0;
-	assign outflags = en ? fin[6:4] : 0;
+	assign en = cu_state == FLAGS_1 || cu_state == FLAGS_2 || cu_state == UPDATE_PC;
+	assign inflags = fin[3:0];
+	assign outflags = fin[6:4];
 	assign cuout = ir_reg;
 endmodule

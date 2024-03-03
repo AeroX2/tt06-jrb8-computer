@@ -21,10 +21,12 @@ async def setup(dut):
 
 async def jmp_tick(jmp, clk):
     pc_value_high = random.randint(0, 255)
+    jmp.highbits_we.value = 1
     jmp.databus.value = pc_value_high
     await ClockCycles(clk, 1)
     assert jmp.pcoe.value == 0
     pc_value_low = random.randint(0, 255)
+    jmp.highbits_we.value = 0
     jmp.databus.value = pc_value_low
 
     jmp.oe.value = 1

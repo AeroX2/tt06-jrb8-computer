@@ -9,6 +9,7 @@ module jmp(
 	input cflag,
 	input sflag,
 	input oe,
+	input highbits_we,
 	output pcoe,
 	output [15:0] pcout
 );
@@ -38,11 +39,11 @@ module jmp(
 	assign pcoe = oe ? flags[sel] : 0;
 
 	reg [7:0] highbits;
-	always @(posedge clk, posedge rst) begin
+	always_ff @(posedge clk, posedge rst) begin
 		if (rst)
 			highbits <= 8'h00;
-		// else // TODO: Fix this
-			// highbits <= databus;
+		else if (highbits_we) // TODO: Fix this
+			highbits <= databus;
 	end
 
 	wire [15:0] two_byte_address = {highbits, databus}; 

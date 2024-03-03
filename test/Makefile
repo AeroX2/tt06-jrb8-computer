@@ -14,10 +14,10 @@ VERILOG_SOURCES += \
 	$(PWD)/tb.v \
 	$(SRC)/tt_um_aerox2_jrb8_computer.v \
 	$(SRC)/alu.v \
-	$(SRC)/cmp.v \
-	$(SRC)/cu.v \
-	$(SRC)/jmp.v \
-	$(SRC)/spi.v
+	$(SRC)/cmp.sv \
+	$(SRC)/cu.sv \
+	$(SRC)/jmp.sv \
+	$(SRC)/spi.sv
 
 else
 

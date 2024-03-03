@@ -11,7 +11,8 @@ module cu(
 	input pcinflag,
 	input [15:0] pcin,
 	output logic [15:0] pc,
-	output logic en,
+	output logic input_we,
+	output logic highbits_we,
 
 	output logic [4:0] inflags,
 	output logic [3:0] outflags,
@@ -144,7 +145,8 @@ module cu(
 	end
 
 	assign pc = pc_reg;
-	assign en = cu_state == UPDATE_IR || cu_state == FLAGS_1_EVENTS || cu_state == FLAGS_2_EVENTS;
+	assign input_we = cu_state == UPDATE_IR || cu_state == FLAGS_1_EVENTS || cu_state == FLAGS_2_EVENTS;
+	assign highbits_we = cu_state == FLAGS_1_EVENTS;
 	assign inflags = fin[3:0];
 	assign outflags = fin[6:4];
 	assign cuout = ir_reg;

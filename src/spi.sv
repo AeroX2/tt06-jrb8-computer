@@ -30,13 +30,13 @@ module spi (
               RECEIVE_DATA = 4;
 
   // Registers
-  reg [4:0]   shift_counter;
-  reg [3:0]   spi_state;
-  reg [7:0]   data_reg;
-  reg         done_reg;
+  logic [4:0]   shift_counter;
+  logic [3:0]   spi_state;
+  logic [7:0]   data_reg;
+  logic         done_reg;
 
-  reg         sclk_reg;
-  reg [15:0]  mosi_reg;
+  logic         sclk_reg;
+  logic [15:0]  mosi_reg;
 
   // State transition and control logic
   always_ff @(posedge clk, posedge rst) begin

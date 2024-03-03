@@ -100,7 +100,8 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.miso(miso)
 	);
 
-	wire en;
+	wire input_we;
+	wire highbits_we;
     wire pcinflag;
 	wire [15:0] pc;
     wire [15:0] pcin;
@@ -111,7 +112,8 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.clk(clk),
 		.rst(rst),
 		.halt(halt),
-		.en(en),
+		.input_we(input_we),
+		.highbits_we(highbits_we),
 		
 		.spi_executing(spi_executing),
 		.spi_done(spi_done),
@@ -131,7 +133,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	wire [4:0] inflags;
 	wire [3:0] outflags;
 
-	wire [15:0] in_decoder = 8'b0000_0001 << (en ? inflags : 16'h00);
+	wire [15:0] in_decoder = 8'b0000_0001 << (input_we ? inflags : 16'h00);
 	wire [7:0] out_decoder = 8'b0000_0001 << outflags;
 
 	wire oi = in_decoder[1];
@@ -206,6 +208,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.sflag(sflag),
 		.pcoe(pcinflag),
 		.pcout(pcin),
-		.oe(jmpi)
+		.oe(jmpi),
+		.highbits_we(highbits_we)
 	);
 endmodule

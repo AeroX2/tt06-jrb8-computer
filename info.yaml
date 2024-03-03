@@ -58,7 +58,7 @@ project:
     - "alu.v"
     - "cmp.sv"
     - "cu.sv"
-    - "jmp.v"
+    - "jmp.sv"
     - "spi.sv"
     - "tt_um_aerox2_jrb8_computer.v"
 

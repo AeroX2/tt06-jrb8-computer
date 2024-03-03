@@ -140,35 +140,35 @@ async def run(dut, ROM, cycles):
             print(RAM[:50])
             break
 
-# @cocotb.test()
-# async def test_add_example(dut):
-#     await run(dut, ROM_ADD_EXAMPLE, 100)
-#     assert dut.tt_um_aerox2_jrb8_computer.uo_out.value == 34
+@cocotb.test()
+async def test_add_example(dut):
+    await run(dut, ROM_ADD_EXAMPLE, 100)
+    assert dut.tt_um_aerox2_jrb8_computer.uo_out.value == 34
 
 @cocotb.test()
 async def test_jmp_example(dut):
     await run(dut, ROM_JMP_EXAMPLE, 200)
     assert dut.tt_um_aerox2_jrb8_computer.areg.value == 6
 
-# @cocotb.test()
-# async def test_division_example(dut):
-#     await run(dut, ROM_DIVISION_EXAMPLE, 900)
-#     assert dut.tt_um_aerox2_jrb8_computer.areg.value == 4
-#     assert dut.tt_um_aerox2_jrb8_computer.creg.value == 7
+@cocotb.test()
+async def test_division_example(dut):
+    await run(dut, ROM_DIVISION_EXAMPLE, 900)
+    assert dut.tt_um_aerox2_jrb8_computer.areg.value == 4
+    assert dut.tt_um_aerox2_jrb8_computer.creg.value == 7
 
-# @cocotb.test()
-# async def test_ram_example(dut):
-#     await run(dut, ROM_RAM_EXAMPLE, 100)
-#     assert RAM[21] == 12
-#     assert RAM[43] == 34
-#     assert RAM[65] == 56
-#     assert dut.tt_um_aerox2_jrb8_computer.breg.value == 34
-#     assert dut.tt_um_aerox2_jrb8_computer.creg.value == 56
+@cocotb.test()
+async def test_ram_example(dut):
+    await run(dut, ROM_RAM_EXAMPLE, 100)
+    assert RAM[21] == 12
+    assert RAM[43] == 34
+    assert RAM[65] == 56
+    assert dut.tt_um_aerox2_jrb8_computer.breg.value == 34
+    assert dut.tt_um_aerox2_jrb8_computer.creg.value == 56
 
-# @cocotb.test()
-# async def test_fibonacci_example(dut):
-#     await run(dut, ROM_FIBONACCI_EXAMPLE, 500)
-#     assert dut.tt_um_aerox2_jrb8_computer.areg.value == 55
+@cocotb.test()
+async def test_fibonacci_example(dut):
+    await run(dut, ROM_FIBONACCI_EXAMPLE, 500)
+    assert dut.tt_um_aerox2_jrb8_computer.areg.value == 55
 
 # @cocotb.test()
 # async def test_primes_example(dut):

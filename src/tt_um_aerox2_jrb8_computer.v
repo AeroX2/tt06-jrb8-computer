@@ -19,9 +19,6 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	reg [7:0] oreg;
 	reg [7:0] ireg;
 
-	wire [7:0] rom;
-	wire [7:0] ram;
-
 	// Input/output pins
 	assign uio_oe[0] = 1;
 	assign uio_oe[1] = 1;
@@ -91,7 +88,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.start(spi_executing),
 		.done(spi_done),
 		.write(raw_ramil),
-		.address(romo ? pc : mar),
+		.address(romo ? pc : {8'h00, mar}),
 		.data(spi_data),
 
 		.sclk(sclk),
@@ -130,11 +127,11 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	);
 
 	// CU decoding the instruction
-	wire [4:0] inflags;
-	wire [3:0] outflags;
+	wire [3:0] inflags;
+	wire [2:0] outflags;
 
-	wire [15:0] in_decoder = 8'b0000_0001 << (input_we ? inflags : 16'h00);
-	wire [7:0] out_decoder = 8'b0000_0001 << outflags;
+	wire [15:0] in_decoder = 'b1 << (input_we ? inflags : 4'h00);
+	wire [7:0] out_decoder = 'b1 << outflags;
 
 	wire oi = in_decoder[1];
 	wire ramil = in_decoder[2];
@@ -155,9 +152,9 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 
 	// Databus
 	wire [7:0] aluout;
-	wire [7:0] rom_or_ram = (romo || ramo) ? spi_data : 8'h00;
-	wire [7:0] iorg = io ? ireg : 8'h00;
-	wire [7:0] corg = co ? creg : 8'h00;
+	wire [7:0] rom_or_ram = (romo || ramo) ? spi_data : 0;
+	wire [7:0] iorg = io ? ireg : 0;
+	wire [7:0] corg = co ? creg : 0;
 	wire [7:0] databus = rom_or_ram | aluout | iorg | corg;
 
 	// ALU

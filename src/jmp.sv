@@ -41,8 +41,8 @@ module jmp(
 	reg [7:0] highbits;
 	always_ff @(posedge clk, posedge rst) begin
 		if (rst)
-			highbits <= 8'h00;
-		else if (highbits_we) // TODO: Fix this
+			highbits <= 0;
+		else if (highbits_we)
 			highbits <= databus;
 	end
 
@@ -50,5 +50,5 @@ module jmp(
 	wire [15:0] pcadd = pcin + two_byte_address;
 
 	wire [15:0] muxoutput = val[4] ? pcadd : two_byte_address;
-	assign pcout = pcoe ? muxoutput : 16'h0000;
+	assign pcout = pcoe ? muxoutput : 0;
 endmodule

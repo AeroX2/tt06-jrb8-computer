@@ -14,8 +14,8 @@ module cu(
 	output logic input_we,
 	output logic highbits_we,
 
-	output logic [4:0] inflags,
-	output logic [3:0] outflags,
+	output logic [3:0] inflags,
+	output logic [2:0] outflags,
 	output logic [7:0] cuout
 );
 	// TODO: Check if roms are actually getting read
@@ -42,7 +42,6 @@ module cu(
 	logic [7:0] ir_reg;
 
 	logic [15:0] pc_reg;
-	logic pcc;
 
 	always_ff @(negedge clk, posedge rst) begin
 		if (rst) begin
@@ -65,10 +64,10 @@ module cu(
 				end
 				FLAGS_1: begin
 					// PCC, RAMI, ROMO, RAMO
-					if (cu_rom[ir_reg][7] ||
+					if (fin[7] ||
 					    inflags == 2 ||
 						outflags == 5 ||
-						cu_rom[ir_reg][6:4] == 6
+						outflags == 6
 					) begin
 						spi_executing <= 1;
 						cu_state <= FLAGS_1_SPI;
@@ -91,10 +90,10 @@ module cu(
 				end
 				FLAGS_2: begin
 					// PCC, RAMI, ROMO, RAMO
-					if (cu_rom_2[ir_reg][7] ||
+					if (fin[7] ||
 					    inflags == 2 ||
 						outflags == 5 ||
-						cu_rom_2[ir_reg][6:4] == 6
+						outflags == 6
 					) begin
 						spi_executing <= 1;
 						cu_state <= FLAGS_2_SPI;
@@ -128,7 +127,7 @@ module cu(
 		case (cu_state)
 			UPDATE_SPI,
 			UPDATE_IR:
-				fin = 8'h50;
+				fin = 'h50;
 			FLAGS_1,
 			FLAGS_1_SPI,
 			FLAGS_1_EVENTS: begin

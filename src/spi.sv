@@ -19,8 +19,8 @@ module spi (
 );
 
   // Constants
-  localparam READ_COMMAND = 8'h03;
-  localparam WRITE_COMMAND = 8'h02;
+  localparam READ_COMMAND = 'h03;
+  localparam WRITE_COMMAND = 'h02;
   
   // States
   localparam  IDLE = 0,
@@ -30,8 +30,8 @@ module spi (
               RECEIVE_DATA = 4;
 
   // Registers
-  logic [4:0]   shift_counter;
-  logic [3:0]   spi_state;
+  logic [3:0]   shift_counter;
+  logic [2:0]   spi_state;
   logic [7:0]   data_reg;
   logic         done_reg;
 
@@ -93,7 +93,7 @@ module spi (
               spi_state <= (write) ? SEND_DATA : RECEIVE_DATA;
 
               if (write)
-                mosi_reg <= databus;
+                mosi_reg <= {8'h00, databus};
             end
           end
         end

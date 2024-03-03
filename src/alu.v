@@ -29,13 +29,13 @@ module alu(
 	wire [7:0] aandz = za ? 0 : a;
 	wire [7:0] bandz = zb ? 0 : b;
 	
-	wire signed [7:0] xora = aandz ^ {8{ia}};
-	wire signed [7:0] xorb = bandz ^ {8{ib}};
+	wire [7:0] xora = aandz ^ {8{ia}};
+	wire [7:0] xorb = bandz ^ {8{ib}};
 	
 	wire carried = carry && carryin;
 	
-	wire signed [8:0] sum = xora + xorb + {9{8'b0, carried}};
-	wire signed [7:0] added = sum[7:0];
+	wire [8:0] sum = xora + xorb + {9{8'b0, carried}};
+	wire [7:0] added = sum[7:0];
 	
 	wire [7:0] anded = xora & xorb;
 	

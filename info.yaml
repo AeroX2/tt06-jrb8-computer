@@ -20,7 +20,7 @@ project:
     - "cu.sv"
     - "jmp.sv"
     - "spi.sv"
-    - "tt_um_aerox2_jrb8_computer.v"
+    - "tt_um_aerox2_jrb8_computer.sv"
 
 # The pinout of your project. Leave unused pins blank. DO NOT delete or add any pins.
 pinout:

@@ -3,6 +3,7 @@ import random
 from cocotb.clock import Clock
 from cocotb.triggers import Timer, ClockCycles
 
+
 async def setup(dut):
     cmp = dut.tt_um_aerox2_jrb8_computer.cmp_module
     clk = cmp.clk
@@ -17,6 +18,7 @@ async def setup(dut):
 
     return cmp, clk
 
+
 @cocotb.test()
 async def test_cmp_sanity(dut):
     cmp, clk = await setup(dut)
@@ -27,6 +29,7 @@ async def test_cmp_sanity(dut):
     assert cmp.oflag.value == 0
     assert cmp.cflag.value == 0
     assert cmp.sflag.value == 0
+
 
 @cocotb.test()
 async def test_cmp_values_set(dut):

@@ -13,9 +13,11 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	wire rst = !rst_n;
 
 	reg [7:0] mar;
+	reg [7:0] mpage;
 	reg [7:0] areg;
 	reg [7:0] breg;
 	reg [7:0] creg;
+	reg [7:0] dreg;
 	reg [7:0] oreg;
 	reg [7:0] ireg;
 
@@ -43,20 +45,26 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	always @(posedge clk, posedge rst) begin
 		if (rst) begin
 			mar <= 0;
+			mpage <= 0;
 			areg <= 0;
 			breg <= 0;
 			creg <= 0;
+			dreg <= 0;
 			oreg <= 0;
 			ireg <= 0;
 		end else if (clk) begin
 			if (mari)
 				mar <= databus;
+			if (mpagei)
+				mpage <= databus;
 			if (ai)
 				areg <= databus;
 			if (bi)
 				breg <= databus;
 			if (ci)
 				creg <= databus;
+			if (di)
+				dreg <= databus;
 			if (oi)
 				oreg <= databus;
 			ireg <= ui_in;
@@ -64,12 +72,14 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	end
 	assign uo_out = oreg;
 
-	// TODO: This seems a little unclean.
-	wire raw_ramil = inflags == 2;
+	logic [21:0] flags_noc;
+	wire romo_noc = flags_noc[9];
+	wire ramo_noc = flags_noc[10];
+	wire rami_noc = flags_noc[13];
 
 	wire cs;
-	wire cs_rom = romo ? cs : 1;
-	wire cs_ram = (raw_ramil || ramo) ? cs : 1;
+	wire cs_rom = romo_noc ? cs : 1;
+	wire cs_ram = (rami_noc || ramo_noc) ? cs : 1;
 
 	wire mosi;
 	wire miso = uio_in[2];
@@ -87,8 +97,8 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 
 		.start(spi_executing),
 		.done(spi_done),
-		.write(raw_ramil),
-		.address(romo ? pc : {8'h00, mar}),
+		.write(rami_noc),
+		.address(romo_noc ? pc : {mpage, mar}),
 		.data(spi_data),
 
 		.sclk(sclk),
@@ -97,11 +107,11 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.miso(miso)
 	);
 
-	wire input_we;
 	wire highbits_we;
     wire pcinflag;
 	wire [15:0] pc;
     wire [15:0] pcin;
+	logic [21:0] flags;
 
 	// CU
 	wire [7:0] cins;
@@ -109,7 +119,6 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.clk(clk),
 		.rst(rst),
 		.halt(halt),
-		.input_we(input_we),
 		.highbits_we(highbits_we),
 		
 		.spi_executing(spi_executing),
@@ -121,50 +130,76 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.pcin(pcin),
 		.pc(pc),
 		
-		.inflags(inflags),
-		.outflags(outflags),
+		.flags(flags),
+		.flags_noc(flags_noc),
 		.cuout(cins)
 	);
 
 	// CU decoding the instruction
-	wire [3:0] inflags;
-	wire [2:0] outflags;
+	wire io = flags[0];
+	wire ao = flags[1] || (flags_noc[1] && rami_noc);
+	wire bo = flags[2] || (flags_noc[2] && rami_noc);
+	wire co = flags[3] || (flags_noc[3] && rami_noc);
+	wire doo = flags[4] || (flags_noc[4] && rami_noc);
+	wire ao2 = flags[5];
+	wire bo2 = flags[6];
+	wire co2 = flags[7];
+	wire doo2 = flags[8];
+	wire romo = flags[9];
+	wire ramo = flags[10];
+	wire jmpo = flags[11];
 
-	wire [15:0] in_decoder = 'b1 << (input_we ? inflags : 4'h00);
-	wire [7:0] out_decoder = 'b1 << outflags;
-
-	wire oi = in_decoder[1];
-	wire ramil = in_decoder[2];
-	wire mari = in_decoder[3];
-	wire ai = in_decoder[4];
-	wire bi = in_decoder[5];
-	wire ci = in_decoder[6];
-	wire jmpi = in_decoder[7];
-	// wire ramih = in_decoder[7];
-	wire halt = in_decoder[15];
-
-	wire io = out_decoder[1];
-	wire ao = out_decoder[2];
-	wire bo = out_decoder[3];
-	wire co = out_decoder[4];
-	wire romo = out_decoder[5];
-	wire ramo = out_decoder[6];
+	wire oi = flags[12];
+	wire rami = flags[13];
+	wire mari = flags[14];
+	wire mpagei = flags[15];
+	wire ai = flags[16];
+	wire bi = flags[17];
+	wire ci = flags[18];
+	wire di = flags[19];
+	wire pcc = flags[20];
+	wire halt = flags[21];
 
 	// Databus
 	wire [7:0] aluout;
 	wire [7:0] rom_or_ram = (romo || ramo) ? spi_data : 0;
 	wire [7:0] iorg = io ? ireg : 0;
-	wire [7:0] corg = co ? creg : 0;
-	wire [7:0] databus = rom_or_ram | aluout | iorg | corg;
+	wire [7:0] databus = rom_or_ram | aluout | iorg;
+	wire aluo = ao | bo | co | doo;
+
+	logic [7:0] a_alu_in;
+	logic [7:0] b_alu_in;
+	always_comb begin
+		if (ao)
+			a_alu_in = areg;
+		else if (bo)
+			a_alu_in = breg;
+		else if (co)
+			a_alu_in = creg;
+		else if (doo)
+			a_alu_in = dreg;
+		else
+			a_alu_in = 0;
+
+		if (ao2)
+			b_alu_in = areg;
+		else if (bo2)
+			b_alu_in = breg;
+		else if (co2)
+			b_alu_in = creg;
+		else if (doo2)
+			b_alu_in = dreg;
+		else
+			b_alu_in = 0;
+	end
 
 	// ALU
-	wire aluo = ao | bo;
 	wire overout;
 	wire carryout;
 	wire cmpo;
 	alu alu_module(
-		.a(areg),
-		.b(breg),
+		.a(a_alu_in),
+		.b(b_alu_in),
 		.carryin(cflag),
 		.oe(aluo),
 		.cins(cins),
@@ -205,7 +240,7 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		.sflag(sflag),
 		.pcoe(pcinflag),
 		.pcout(pcin),
-		.oe(jmpi),
+		.oe(jmpo),
 		.highbits_we(highbits_we)
 	);
 endmodule

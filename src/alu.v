@@ -23,6 +23,7 @@ module alu(
 	wire ib = val[3];
 	wire io = val[4];
 	wire carry = val[5];
+	// TODO
 	// wire cselect = val[7:6];
 	assign cmpo = oe && val[8];
 	

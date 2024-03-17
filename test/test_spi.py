@@ -7,8 +7,9 @@ from cocotb.handle import Force
 IDLE = 0
 SEND_COMMAND = 1
 SEND_ADDRESS = 2
-SEND_DATA    = 3
+SEND_DATA = 3
 RECEIVE_DATA = 4
+
 
 async def setup(dut):
     spi = dut.tt_um_aerox2_jrb8_computer.spi_module
@@ -54,7 +55,7 @@ async def test_serial_rom_out(dut):
     for i in range(8):
         await RisingEdge(spi.sclk)
         output |= spi.mosi.value.integer << (7 - i)
-    assert output == 0x03 #SPI Read command is 0x03
+    assert output == 0x03  # SPI Read command is 0x03
 
     await FallingEdge(spi.sclk)
     await Timer(1)  # `<=` causes a slight delay, wait for it
@@ -83,6 +84,7 @@ async def test_serial_rom_out(dut):
     await ClockCycles(clk, 100)
     assert spi.spi_state.value == IDLE
 
+
 @cocotb.test()
 async def test_serial_ram_out(dut):
     spi, clk = await setup(dut)
@@ -106,7 +108,7 @@ async def test_serial_ram_out(dut):
     for i in range(8):
         await RisingEdge(spi.sclk)
         output |= spi.mosi.value.integer << (7 - i)
-    assert output == 0x03 #SPI Read command is 0x03
+    assert output == 0x03  # SPI Read command is 0x03
 
     await FallingEdge(spi.sclk)
     await Timer(1)  # `<=` causes a slight delay, wait for it
@@ -135,6 +137,7 @@ async def test_serial_ram_out(dut):
     await ClockCycles(clk, 100)
     assert spi.spi_state.value == IDLE
 
+
 @cocotb.test()
 async def test_serial_ram_in(dut):
     spi, clk = await setup(dut)
@@ -162,7 +165,7 @@ async def test_serial_ram_in(dut):
     for i in range(8):
         await RisingEdge(spi.sclk)
         output |= spi.mosi.value.integer << (7 - i)
-    assert output == 0x02 #SPI Write command is 0x02
+    assert output == 0x02  # SPI Write command is 0x02
 
     await FallingEdge(spi.sclk)
     await Timer(1)  # `<=` causes a slight delay, wait for it

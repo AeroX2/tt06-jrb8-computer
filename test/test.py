@@ -1,3 +1,6 @@
+import os
+print(os.environ)
+
 from test_alu import *
 from test_cmp import *
 from test_jmp import *

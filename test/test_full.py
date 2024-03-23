@@ -1,6 +1,7 @@
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import Timer, RisingEdge, FallingEdge, ClockCycles
+from cocotb.triggers import Timer, RisingEdge, FallingEdge, ClockCycles, NextTimeStep
+from cocotb.handle import NonHierarchyIndexableObject
 
 ROM_ADD_EXAMPLE = [0xC0, 0x10, 0xC1, 0x12, 0x68, 0xF0, 0xFF]
 
@@ -137,7 +138,7 @@ async def setup(dut):
 
     computer = dut.tt_um_aerox2_jrb8_computer
     clk = computer.clk
-    sclk = computer.spi_module.sclk
+    sclk = computer.uio_out[3]
 
     clock = Clock(clk, 10, units="us")
     cocotb.start_soon(clock.start())
@@ -165,48 +166,60 @@ async def setup(dut):
 
     return mock, clk, sclk
 
+async def wait_for_sclk(sclk, v):
+    q = sclk.value
+    while q != v:
+        q = sclk.value
+        await Timer(5, "us")
+
 
 async def send_rom_data(computer, sclk, ROM):
     read = 0
     for i in range(8):
-        await RisingEdge(sclk)
+        await wait_for_sclk(sclk, 1)
         read |= computer.uio_out[1].value.integer << (7 - i)
+        await wait_for_sclk(sclk, 0)
     assert bin(read) == bin(0x3)
 
     pc = 0
     for i in range(16):
-        await RisingEdge(sclk)
+        await wait_for_sclk(sclk, 1)
         pc |= computer.uio_out[1].value.integer << (15 - i)
+        await wait_for_sclk(sclk, 0)
 
     print("Reading ROM from", pc)
 
     data = ROM[pc]
     for i in range(8):
-        await FallingEdge(sclk)
+        await wait_for_sclk(sclk, 0)
         computer.uio_in[2].value = (data >> (7 - i)) & 1
-    await FallingEdge(sclk)
+        await wait_for_sclk(sclk, 1)
+    await wait_for_sclk(sclk, 0)
     computer.uio_in[2].value = 0
 
 
 async def send_ram_data(computer, sclk):
     read_or_write = 0
     for i in range(8):
-        await RisingEdge(sclk)
+        await wait_for_sclk(sclk, 1)
         read_or_write |= computer.uio_out[1].value.integer << (7 - i)
+        await wait_for_sclk(sclk, 0)
     assert bin(read_or_write) == bin(0x2) or bin(read_or_write) == bin(0x3)
 
     mar = 0
     for i in range(16):
-        await RisingEdge(sclk)
+        await wait_for_sclk(sclk, 1)
         mar |= computer.uio_out[1].value.integer << (15 - i)
+        await wait_for_sclk(sclk, 0)
 
     if read_or_write == 0x2:
         # Write
         data = 0
         for i in range(8):
-            await RisingEdge(sclk)
+            await wait_for_sclk(sclk, 1)
             data |= computer.uio_out[1].value.integer << (7 - i)
-        await FallingEdge(sclk)
+            await wait_for_sclk(sclk, 0)
+        await wait_for_sclk(sclk, 0)
 
         print("Written data is", data)
         RAM[mar] = data
@@ -215,9 +228,10 @@ async def send_ram_data(computer, sclk):
         data = RAM[mar]
         print("Read data is", data)
         for i in range(8):
-            await FallingEdge(sclk)
+            await wait_for_sclk(sclk, 0)
             computer.uio_in[2].value = (data >> (7 - i)) & 1
-        await FallingEdge(sclk)
+            await wait_for_sclk(sclk, 1)
+        await wait_for_sclk(sclk, 0)
         computer.uio_in[2].value = 0
 
 

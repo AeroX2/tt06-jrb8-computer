@@ -19,6 +19,9 @@ VERILOG_SOURCES += \
 	$(SRC)/jmp.sv \
 	$(SRC)/spi.sv
 
+TOPLEVEL = tb
+MODULE = test
+
 else
 
 # gate level simulation requires some extra setup, you shouldn't need to touch this
@@ -32,13 +35,12 @@ VERILOG_SOURCES += $(PDK_ROOT)/sky130A/libs.ref/sky130_fd_sc_hd/verilog/sky130_f
 
 # this gets copied in by the GDS action workflow
 VERILOG_SOURCES += $(PWD)/tb.v $(PWD)/gate_level_netlist.v
+
+TOPLEVEL = tb
+MODULE = test_gates
+
 endif
 
-# TOPLEVEL is the name of the toplevel module in your Verilog or VHDL file
-TOPLEVEL = tb
-
-# MODULE is the basename of the Python test file
-MODULE = test
 
 # include cocotb's make rules to take care of the simulator setup
 include $(shell cocotb-config --makefiles)/Makefile.sim

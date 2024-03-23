@@ -25,10 +25,10 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	assign uio_oe[0] = 1;
 	assign uio_oe[1] = 1;
 	assign uio_oe[2] = 0;
-	assign uio_oe[3] = 0;
+	assign uio_oe[3] = 1;
 	assign uio_oe[4] = 1;
-	assign uio_oe[5] = 1;
-	assign uio_oe[6] = 1;
+	assign uio_oe[5] = 0;
+	assign uio_oe[6] = 0;
 	assign uio_oe[7] = 0;
 
 	assign uio_out[0] = cs_rom;

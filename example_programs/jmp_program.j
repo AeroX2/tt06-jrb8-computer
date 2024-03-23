@@ -1,5 +1,6 @@
 jmp start
 :end
+out a
 pause
 :start
 load rom a 1

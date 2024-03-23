@@ -11,3 +11,6 @@ load ram[43] b
 
 load rom c 65
 load ram[c] c
+
+out b
+out c

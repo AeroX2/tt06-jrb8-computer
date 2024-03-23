@@ -16,6 +16,8 @@ jmp loop1
 :loop1exit
 opp a+b
 
+out a
+out c
 pause
 
 // a = a % b

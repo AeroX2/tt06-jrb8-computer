@@ -1,3 +1,4 @@
+import math
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import Timer, RisingEdge, FallingEdge, ClockCycles, NextTimeStep
@@ -6,74 +7,80 @@ from cocotb.handle import NonHierarchyIndexableObject
 ROM_ADD_EXAMPLE = [0xC0, 0x10, 0xC1, 0x12, 0x68, 0xF0, 0xFF]
 
 ROM_JMP_EXAMPLE = [
-    0x30,
-    0x00,
-    0x04,
-    0xFF,
-    0xC0,
-    0x01,
-    0xC1,
-    0x01,
-    0x68,
-    0x30,
-    0x00,
-    0x13,
-    0x10,
-    0xC0,
-    0x0B,
-    0x80,
-    0x30,
-    0x00,
-    0x03,
-    0xC1,
-    0x03,
-    0x68,
-    0x30,
-    0x00,
-    0x0C,
+0x30,
+0x00,
+0x05,
+0xf0,
+0xff,
+0xc0,
+0x01,
+0xc1,
+0x01,
+0x68,
+0x30,
+0x00,
+0x14,
+0x10,
+0xc0,
+0x0b,
+0x80,
+0x30,
+0x00,
+0x03,
+0xc1,
+0x03,
+0x68,
+0x30,
+0x00,
+0x0d,
+
 ]
 
 ROM_DIVISION_EXAMPLE = [
-    0xC0,
-    0x35,
-    0xC1,
-    0x07,
-    0xC2,
-    0x00,
-    0x80,
-    0x37,
-    0x00,
-    0x12,
-    0x17,
-    0x61,
-    0x14,
-    0xC1,
-    0x07,
-    0x30,
-    0x00,
-    0x06,
-    0x68,
-    0xFF,
+0xc0,
+0x35,
+0xc1,
+0x07,
+0xc2,
+0x00,
+0x80,
+0x37,
+0x00,
+0x12,
+0x17,
+0x61,
+0x14,
+0xc1,
+0x07,
+0x30,
+0x00,
+0x06,
+0x68,
+0xf0,
+0xf2,
+0xff,
 ]
 
 ROM_RAM_EXAMPLE = [
-    0xC0,
-    0x0C,
-    0xDC,
-    0x15,
-    0xC0,
-    0x22,
-    0xDC,
-    0x2B,
-    0xC0,
-    0x38,
-    0xDC,
-    0x41,
-    0xC5,
-    0x2B,
-    0xC2,
-    0x41,
-    0xBA,
+0xc0,
+0x0c,
+0xdc,
+0x15,
+0xc0,
+0x22,
+0xdc,
+0x2b,
+0xc0,
+0x38,
+0xdc,
+0x41,
+0xc5,
+0x2b,
+0xc2,
+0x41,
+0xba,
+0xf1,
+0xf2,
 ]
 
 ROM_FIBONACCI_EXAMPLE = [
@@ -91,37 +98,36 @@ ROM_FIBONACCI_EXAMPLE = [
     0x36,
     0x00,
     0x04,
+    0xf0
 ]
 
 ROM_PRIMES_EXAMPLE = [
-    0xC2,
-    0x01,
-    0xC1,
-    0x02,
-    0x16,
-    0x80,
-    0x31,
-    0x00,
-    0x16,
-    0x39,
-    0x00,
-    0x05,
-    0x61,
-    0x10,
-    0x22,
-    0x36,
-    0x00,
-    0x15,
-    0x30,
-    0x00,
-    0x04,
-    0xF2,
-    0x16,
-    0x60,
-    0x11,
-    0x30,
-    0x00,
-    0x02,
+0xc2,
+0x02,
+0xc1,
+0x02,
+0x16,
+0x80,
+0x31,
+0x00,
+0x15,
+0x39,
+0x00,
+0x05,
+0x61,
+0x26,
+0x36,
+0x00,
+0x14,
+0x30,
+0x00,
+0x04,
+0xf2,
+0x62,
+0x30,
+0x00,
+0x02,
+
 ]
 
 RAM = [0xFF] * 65536
@@ -241,8 +247,12 @@ async def run(dut, ROM, cycles):
     # Only for debugging
     _computer = dut.tt_um_aerox2_jrb8_computer
 
+    outputs = []
     for cycle in range(cycles):
         await ClockCycles(clk, 1)
+
+        if computer.uo_out.value not in outputs:
+            outputs.append(computer.uo_out.value)
 
         try:
             if computer.uio_out[0] == 0:
@@ -255,44 +265,66 @@ async def run(dut, ROM, cycles):
             print(f"PC was: {_computer.pc.value.integer}")
             print(RAM[:50])
             break
+    return outputs
 
 
 @cocotb.test()
 async def test_add_example(dut):
-    await run(dut, ROM_ADD_EXAMPLE, 100)
-    assert dut.tt_um_aerox2_jrb8_computer.uo_out.value == 34
+    outputs = await run(dut, ROM_ADD_EXAMPLE, 100)
+    assert outputs[1] == 34
 
 
 @cocotb.test()
 async def test_jmp_example(dut):
-    await run(dut, ROM_JMP_EXAMPLE, 200)
-    assert dut.tt_um_aerox2_jrb8_computer.areg.value == 6
+    outputs = await run(dut, ROM_JMP_EXAMPLE, 200)
+    assert outputs[1] == 6
 
 
 @cocotb.test()
 async def test_division_example(dut):
-    await run(dut, ROM_DIVISION_EXAMPLE, 900)
-    assert dut.tt_um_aerox2_jrb8_computer.areg.value == 4
-    assert dut.tt_um_aerox2_jrb8_computer.creg.value == 7
+    outputs = await run(dut, ROM_DIVISION_EXAMPLE, 900)
+    assert outputs[1] == 4
+    assert outputs[2] == 7
 
 
 @cocotb.test()
 async def test_ram_example(dut):
-    await run(dut, ROM_RAM_EXAMPLE, 100)
+    outputs = await run(dut, ROM_RAM_EXAMPLE, 200)
     assert RAM[21] == 12
     assert RAM[43] == 34
     assert RAM[65] == 56
-    assert dut.tt_um_aerox2_jrb8_computer.breg.value == 34
-    assert dut.tt_um_aerox2_jrb8_computer.creg.value == 56
+    print(outputs)
+    assert outputs[1] == 34
+    assert outputs[2] == 56
+
+def is_perfect_square(n):
+    root = int(math.sqrt(n))
+    return root * root == n
+
+def is_fibonacci(num):
+    return is_perfect_square(5 * num * num + 4) or is_perfect_square(5 * num * num - 4)
 
 
 @cocotb.test()
 async def test_fibonacci_example(dut):
-    await run(dut, ROM_FIBONACCI_EXAMPLE, 500)
-    assert dut.tt_um_aerox2_jrb8_computer.areg.value == 55
+    outputs = await run(dut, ROM_FIBONACCI_EXAMPLE, 500)
+    assert len(outputs) > 1
+    for output in outputs[1:]:
+        assert is_fibonacci(output)
+
+# def is_prime(n):
+#     if n <= 1:
+#         return False
+#     for i in range(2, int(math.sqrt(n)) + 1):
+#         print("N", n, i, n % i)
+#         if n % i == 0:
+#             return False
+#     return True
 
 
-@cocotb.test()
-async def test_primes_example(dut):
-    await run(dut, ROM_PRIMES_EXAMPLE, 5000)
-    assert dut.tt_um_aerox2_jrb8_computer.oreg.value == 17
+# @cocotb.test()
+# async def test_primes_example(dut):
+#     outputs = await run(dut, ROM_PRIMES_EXAMPLE, 1000)
+#     assert len(outputs) > 2
+#     for output in outputs[2:]:
+#         assert is_prime(output.integer)

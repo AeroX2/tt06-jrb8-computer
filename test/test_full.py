@@ -1,135 +1,13 @@
 import math
+import glob
+from pathlib import Path
+
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import Timer, RisingEdge, FallingEdge, ClockCycles, NextTimeStep
 from cocotb.handle import NonHierarchyIndexableObject
 
-ROM_ADD_EXAMPLE = [0xC0, 0x10, 0xC1, 0x12, 0x68, 0xF0, 0xFF]
-
-ROM_JMP_EXAMPLE = [
-    0x30,
-    0x00,
-    0x05,
-    0xF0,
-    0xFF,
-    0xC0,
-    0x01,
-    0xC1,
-    0x01,
-    0x68,
-    0x30,
-    0x00,
-    0x14,
-    0x10,
-    0xC0,
-    0x0B,
-    0x80,
-    0x30,
-    0x00,
-    0x03,
-    0xC1,
-    0x03,
-    0x68,
-    0x30,
-    0x00,
-    0x0D,
-]
-
-ROM_DIVISION_EXAMPLE = [
-    0xC0,
-    0x35,
-    0xC1,
-    0x07,
-    0xC2,
-    0x00,
-    0x80,
-    0x37,
-    0x00,
-    0x12,
-    0x17,
-    0x61,
-    0x14,
-    0xC1,
-    0x07,
-    0x30,
-    0x00,
-    0x06,
-    0x68,
-    0xF0,
-    0xF2,
-    0xFF,
-]
-
-ROM_RAM_EXAMPLE = [
-    0xC0,
-    0x0C,
-    0xDC,
-    0x15,
-    0xC0,
-    0x22,
-    0xDC,
-    0x2B,
-    0xC0,
-    0x38,
-    0xDC,
-    0x41,
-    0xC5,
-    0x2B,
-    0xC2,
-    0x41,
-    0xBA,
-    0xF1,
-    0xF2,
-]
-
-ROM_FIBONACCI_EXAMPLE = [
-    0xC0,
-    0x01,
-    0xC1,
-    0x00,
-    0x11,
-    0x68,
-    0x34,
-    0x00,
-    0x00,
-    0xF0,
-    0x17,
-    0x36,
-    0x00,
-    0x04,
-    0xF0,
-]
-
-ROM_PRIMES_EXAMPLE = [
-    0xC2,
-    0x02,
-    0xC1,
-    0x02,
-    0x16,
-    0x80,
-    0x31,
-    0x00,
-    0x15,
-    0x39,
-    0x00,
-    0x05,
-    0x61,
-    0x26,
-    0x36,
-    0x00,
-    0x14,
-    0x30,
-    0x00,
-    0x04,
-    0xF2,
-    0x62,
-    0x30,
-    0x00,
-    0x02,
-]
-
 RAM = [0xFF] * 65536
-
 
 class MicroMock(object):
     def __init__(self, **kwargs):
@@ -266,29 +144,43 @@ async def run(dut, ROM, cycles):
             break
     return outputs
 
+async def load_and_run(dut, path, steps):
+    with open(path, "r") as f:
+        program_d = f.readlines()
+    program_b = [int(x,16) for x in program_d[1].split()]
+
+    return await run(dut, program_b, steps)
+
+def string_to_dict(s):
+    if (not s):
+        return {}
+    pairs = [pair.strip().split(':') for pair in s.split(',')]
+    result = {int(pair[0]): int(pair[1]) for pair in pairs}
+    return result
+
 
 @cocotb.test()
 async def test_add_example(dut):
-    outputs = await run(dut, ROM_ADD_EXAMPLE, 100)
+    outputs = await load_and_run(dut, '../example_programs/add_program.o', 100)
     assert outputs[1] == 34
 
 
 @cocotb.test()
 async def test_jmp_example(dut):
-    outputs = await run(dut, ROM_JMP_EXAMPLE, 200)
+    outputs = await load_and_run(dut, '../example_programs/jmp_program.o', 200)
     assert outputs[1] == 6
 
 
 @cocotb.test()
 async def test_division_example(dut):
-    outputs = await run(dut, ROM_DIVISION_EXAMPLE, 900)
+    outputs = await load_and_run(dut, '../example_programs/division_test.o', 900)
     assert outputs[1] == 4
     assert outputs[2] == 7
 
 
 @cocotb.test()
 async def test_ram_example(dut):
-    outputs = await run(dut, ROM_RAM_EXAMPLE, 200)
+    outputs = await load_and_run(dut, '../example_programs/memory_test.o', 200)
     assert RAM[21] == 12
     assert RAM[43] == 34
     assert RAM[65] == 56
@@ -308,7 +200,7 @@ def is_fibonacci(num):
 
 @cocotb.test()
 async def test_fibonacci_example(dut):
-    outputs = await run(dut, ROM_FIBONACCI_EXAMPLE, 500)
+    outputs = await load_and_run(dut, '../example_programs/fibonacci.o', 500)
     assert len(outputs) > 1
     for output in outputs[1:]:
         assert is_fibonacci(output)
@@ -318,7 +210,6 @@ def is_prime(n):
     if n <= 1:
         return False
     for i in range(2, int(math.sqrt(n)) + 1):
-        print("N", n, i, n % i)
         if n % i == 0:
             return False
     return True
@@ -326,7 +217,28 @@ def is_prime(n):
 
 @cocotb.test()
 async def test_primes_example(dut):
-    outputs = await run(dut, ROM_PRIMES_EXAMPLE, 5000)
+    outputs = await load_and_run(dut, '../example_programs/primes.o', 5000)
     assert len(outputs) > 2
     for output in outputs[2:]:
         assert is_prime(output.integer)
+
+# @cocotb.test()
+# async def test_all(dut):
+#     programs = glob.glob('../example_programs/*.e')
+#     for program in programs:
+#         print("Running program: ", program)
+#         path = Path(program)
+
+#         with open(path, "r") as f:
+#             expected_d = f.readlines()
+#         expected_steps = int(expected_d[0][2:])
+#         expected_output = list(map(int, expected_d[2][3:].strip().split(",")))
+#         expected_ram = string_to_dict(expected_d[3][3:].strip())
+
+#         outputs = await load_and_run(dut, path.with_suffix(".o"), expected_steps)
+
+#         for k,v in expected_ram.items():
+#             assert RAM[k] == v
+#         outputs = [x.integer for x in outputs]
+#         assert outputs[1:] == expected_output
+    

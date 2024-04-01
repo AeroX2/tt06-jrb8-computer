@@ -1,0 +1,103 @@
+module alu(
+	input clk,
+	input rst,
+	input [7:0] a,
+	input [7:0] b,
+	input [7:0] cins,
+	input oe,
+	input carryin,
+	output logic carryout,
+	output [7:0] aluout,
+	output overout,
+	output cmpo
+);
+	localparam CLR_CMP_INS  = 0x40;
+	localparam CMP_OFF_INS  = 0x41;
+	localparam CMP_ON_INS   = 0x42;
+	localparam SIGN_OFF_INS = 0x43;
+	localparam SIGN_ON_INS  = 0x44;
+
+	// TODO: Check if roms are actually getting read
+	reg [9:0] alu_rom [0:255];
+	reg [9:0] alu_rom [0:255];
+	initial begin
+		$readmemh("../rom/alu_rom.mem", alu_rom);
+	end
+	wire [8:0] val = alu_rom[cins];
+
+	logic cmp_mode;
+	logic signed_mode;
+	always_ff @(posedge clk, posedge rst) begin
+		if (rst) begin
+			cmp_mode <= 0;
+			signed_mode <= 0;
+		end else if (clk) begin
+			if (cins == CMP_OFF_INS)
+				cmp_mode <= 0;
+			else if (cins == CMP_ON_INS)
+				cmp_mode <= 1;
+			else if (cins == SIGN_OFF_INS)
+				signed_mode <= 0;
+			else if (cins == SIGN_ON_INS)
+				signed_mode <= 1;
+		end
+	end
+	
+	wire za = val[0];
+	wire ia = val[1];
+	wire zb = val[2];
+	wire ib = val[3];
+	wire io = val[4];
+	wire high = val[5];
+	assign cmpo = (oe && cmp_mode) || cins == CLR_CMP_INS;
+	
+	wire [7:0] aandz = za ? 0 : a;
+	wire [7:0] bandz = zb ? 0 : b;
+	
+	wire [7:0] xora = aandz ^ {8{ia}};
+	wire [7:0] xorb = bandz ^ {8{ib}};
+
+	wire [7:0] anded = xora & xorb;
+
+	logic [8:0] full_sum = xora + xorb + {9{8'b0, carryin}};
+	wire [7:0] sum = full_sum[7:0];
+
+	logic [15:0] mult;
+	logic [7:0] div;
+	always_comb begin
+		if (signed_mode) begin
+			mult = $signed(xora) * $signed(xorb);
+			div = $signed(xora) / $signed(xorb);
+		end else begin
+			mult = xora * xorb;
+			div = xora / xorb;
+		end
+	end
+
+	logic [7:0] muxoutput;
+	always_comb begin
+		case (val[7:6])
+			0: begin
+				muxoutput = sum;
+				carryout = full_sum[8];
+			end
+			1: begin
+				muxoutput = anded;
+				carryout = 0;
+			end
+			2: begin
+				muxoutput = mult;
+				carryout = 0;
+			end
+			3: begin
+				muxoutput = div;
+				carryout = 0;
+			end
+		endcase
+	end
+		
+	wire [7:0] out1 = muxoutput ^ {8{io}};
+
+	assign aluout = oe ? out1 : 0;
+	assign overout = ((~out1[7]) & xora[7] & xorb[7]) | (out1[7] & ~xora[7] & ~xorb[7]);
+endmodule

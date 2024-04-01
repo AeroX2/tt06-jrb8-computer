@@ -4,7 +4,7 @@ module alu(
 	input [7:0] cins,
 	input oe,
 	input carryin,
-	output carryout,
+	output logic carryout,
 	output signed [7:0] aluout,
 	output overout,
 	output cmpo
@@ -23,8 +23,6 @@ module alu(
 	wire ib = val[3];
 	wire io = val[4];
 	wire carry = val[5];
-	// TODO
-	// wire cselect = val[7:6];
 	assign cmpo = oe && val[8];
 	
 	wire [7:0] aandz = za ? 0 : a;
@@ -32,25 +30,38 @@ module alu(
 	
 	wire [7:0] xora = aandz ^ {8{ia}};
 	wire [7:0] xorb = bandz ^ {8{ib}};
+
+	wire [7:0] anded = xora & xorb;
 	
 	wire carried = carry && carryin;
-	
 	wire [8:0] sum = xora + xorb + {9{8'b0, carried}};
 	wire [7:0] added = sum[7:0];
 	
-	wire [7:0] anded = xora & xorb;
-	
-	wire [7:0] shiftr = xora >> xorb;
-	wire [7:0] shiftl = xora << xorb;
-	
-	wire ml = val[6];
-	wire mh = val[7];
-	
-	wire [7:0] muxoutput = mh ? (ml ? shiftl : shiftr) : (ml ? anded : added);
+	wire [8:0] shiftr = {9{xora, carried}} >> xorb;
+	wire [8:0] shiftl = {9{xora, carried}} << xorb;
+
+	logic [7:0] muxoutput;
+	always_comb begin
+		case (val[7:6])
+			0: begin
+				muxoutput = added;
+			end
+			1: begin
+				muxoutput = anded;
+			end
+			2: begin
+				muxoutput = shiftr;
+			end
+			3: begin
+				muxoutput = shiftl;
+			end
+		endcase
+	end
+
+	assign carryout = val[7:6] == 0 ? sum[8] : 0;
 		
 	wire [7:0] out1 = muxoutput ^ {8{io}};
 
 	assign aluout = oe ? out1 : 0;
-	assign carryout = sum[8];
 	assign overout = ((~out1[7]) & xora[7] & xorb[7]) | (out1[7] & ~xora[7] & ~xorb[7]);
 endmodule

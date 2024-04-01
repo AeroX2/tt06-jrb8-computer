@@ -13,7 +13,7 @@ ifneq ($(GATES),yes)
 VERILOG_SOURCES += \
 	$(PWD)/tb.v \
 	$(SRC)/tt_um_aerox2_jrb8_computer.sv \
-	$(SRC)/alu.v \
+	$(SRC)/alu.sv \
 	$(SRC)/cmp.sv \
 	$(SRC)/cu.sv \
 	$(SRC)/jmp.sv \

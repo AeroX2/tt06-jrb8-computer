@@ -4,6 +4,7 @@ load rom c 0
 
 :loop1
 opp a-b
+cmp a a
 jmp .<= loop1exit
 
 mov c b

@@ -15,7 +15,6 @@ module jmp(
 );
 	reg [4:0] jmp_rom [0:255];
 
-	// TODO: Check if roms are actually getting read
 	initial begin
 		$readmemh("../rom/jmp_rom.mem", jmp_rom);
 	end

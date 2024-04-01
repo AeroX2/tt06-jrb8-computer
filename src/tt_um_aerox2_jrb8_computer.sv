@@ -198,8 +198,8 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	wire carryout;
 	wire cmpo;
 	alu alu_module(
-		// .clk(clk),
-		// .rst(rst),
+		.clk(clk),
+		.rst(rst),
 		.a(a_alu_in),
 		.b(b_alu_in),
 		.carryin(cflag),

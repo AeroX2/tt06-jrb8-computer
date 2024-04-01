@@ -17,10 +17,9 @@ module cu(
 	output logic [21:0] flags_noc,
 	output logic [7:0] cuout
 );
-	// TODO: Check if roms are actually getting read
 	logic [7:0] cu_rom [0:255];
 	logic [7:0] cu_rom_2 [0:255];
-	logic [21:0] cu_flag_conv [0:76];
+	logic [21:0] cu_flag_conv [0:255];
 	initial begin
 		$readmemh("../rom/cu_rom.mem", cu_rom);
 		$readmemh("../rom/cu_rom_2.mem", cu_rom_2);

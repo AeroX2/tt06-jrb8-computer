@@ -4,10 +4,10 @@ from pathlib import Path
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import Timer, RisingEdge, FallingEdge, ClockCycles, NextTimeStep
-from cocotb.handle import NonHierarchyIndexableObject
+from cocotb.triggers import Timer, ClockCycles
 
 RAM = [0xFF] * 65536
+
 
 class MicroMock(object):
     def __init__(self, **kwargs):
@@ -144,47 +144,55 @@ async def run(dut, ROM, cycles):
             break
     return outputs
 
+
 async def load_and_run(dut, path, steps):
     with open(path, "r") as f:
         program_d = f.readlines()
-    program_b = [int(x,16) for x in program_d[1].split()]
+    program_b = [int(x, 16) for x in program_d[1].split()]
 
     return await run(dut, program_b, steps)
 
+
 def string_to_dict(s):
-    if (not s):
+    if not s:
         return {}
-    pairs = [pair.strip().split(':') for pair in s.split(',')]
+    pairs = [pair.strip().split(":") for pair in s.split(",")]
     result = {int(pair[0]): int(pair[1]) for pair in pairs}
     return result
 
 
 @cocotb.test()
 async def test_add_example(dut):
-    outputs = await load_and_run(dut, '../example_programs/add_program.o', 100)
+    outputs = await load_and_run(dut, "../example_programs/add_program.o", 100)
     assert outputs[1] == 34
 
 
 @cocotb.test()
 async def test_jmp_example(dut):
-    outputs = await load_and_run(dut, '../example_programs/jmp_program.o', 200)
+    outputs = await load_and_run(dut, "../example_programs/jmp_program.o", 200)
     assert outputs[1] == 6
 
 
 @cocotb.test()
 async def test_division_example(dut):
-    outputs = await load_and_run(dut, '../example_programs/division_test.o', 900)
+    outputs = await load_and_run(dut, "../example_programs/division_test.o", 900)
     assert outputs[1] == 4
     assert outputs[2] == 7
+
+@cocotb.test()
+async def test_division_example_2(dut):
+    outputs = await load_and_run(dut, "../example_programs/div_mult_test.o", 900)
+    assert outputs[1] == 7
+    assert outputs[2] == 115
+    assert outputs[3] == 1
 
 
 @cocotb.test()
 async def test_ram_example(dut):
-    outputs = await load_and_run(dut, '../example_programs/memory_test.o', 200)
+    outputs = await load_and_run(dut, "../example_programs/memory_test.o", 200)
     assert RAM[21] == 12
     assert RAM[43] == 34
     assert RAM[65] == 56
-    print(outputs)
     assert outputs[1] == 34
     assert outputs[2] == 56
 
@@ -200,7 +208,7 @@ def is_fibonacci(num):
 
 @cocotb.test()
 async def test_fibonacci_example(dut):
-    outputs = await load_and_run(dut, '../example_programs/fibonacci.o', 500)
+    outputs = await load_and_run(dut, "../example_programs/fibonacci.o", 500)
     assert len(outputs) > 1
     for output in outputs[1:]:
         assert is_fibonacci(output)
@@ -217,10 +225,11 @@ def is_prime(n):
 
 @cocotb.test()
 async def test_primes_example(dut):
-    outputs = await load_and_run(dut, '../example_programs/primes.o', 5000)
+    outputs = await load_and_run(dut, "../example_programs/primes.o", 5000)
     assert len(outputs) > 2
     for output in outputs[2:]:
         assert is_prime(output.integer)
+
 
 # @cocotb.test()
 # async def test_all(dut):
@@ -241,4 +250,3 @@ async def test_primes_example(dut):
 #             assert RAM[k] == v
 #         outputs = [x.integer for x in outputs]
 #         assert outputs[1:] == expected_output
-    

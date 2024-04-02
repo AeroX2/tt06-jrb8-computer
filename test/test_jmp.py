@@ -1,7 +1,8 @@
 import cocotb
 import random
 from cocotb.clock import Clock
-from cocotb.triggers import ClockCycles
+from cocotb.triggers import ClockCycles, Timer
+from cocotb.handle import Force
 
 
 async def setup(dut):
@@ -22,12 +23,15 @@ async def setup(dut):
 async def jmp_tick(jmp, clk):
     pc_value_high = random.randint(0, 255)
     jmp.highbits_we.value = 1
-    jmp.databus.value = pc_value_high
+    jmp.databus.value = Force(pc_value_high)
     await ClockCycles(clk, 1)
+    await Timer(1)
     assert jmp.pcoe.value == 0
+    assert jmp.highbits.value == pc_value_high
+
     pc_value_low = random.randint(0, 255)
     jmp.highbits_we.value = 0
-    jmp.databus.value = pc_value_low
+    jmp.databus.value = Force(pc_value_low)
 
     jmp.oe.value = 1
     await ClockCycles(clk, 1)
@@ -51,7 +55,7 @@ async def test_jmp_jumps_correctly(dut):
     jmp, clk = await setup(dut)
 
     # No condition, always jump
-    jmp.cins.value = 0x30
+    jmp.cins.value = 0x20
     pc_out = await jmp_tick(jmp, clk)
     assert jmp.pcoe.value == 1
     assert jmp.pcout.value == pc_out
@@ -62,25 +66,25 @@ async def test_jmp_conditions(dut):
     jmp, clk = await setup(dut)
 
     # = condition
-    jmp.cins.value = 0x31
+    jmp.cins.value = 0x21
     jmp.zflag.value = 1
     await ClockCycles(clk, 1)
     assert jmp.pcoe.value == 1
-    jmp.cins.value = 0x31
+    jmp.cins.value = 0x21
     jmp.zflag.value = 0
     await ClockCycles(clk, 1)
     assert jmp.pcoe.value == 0
 
     # != condition
-    jmp.cins.value = 0x32
+    jmp.cins.value = 0x22
     jmp.zflag.value = 1
     await ClockCycles(clk, 1)
     assert jmp.pcoe.value == 0
-    jmp.cins.value = 0x32
+    jmp.cins.value = 0x22
     jmp.zflag.value = 0
     await ClockCycles(clk, 1)
     assert jmp.pcoe.value == 1
 
-    # Realistically we should also test all the other conditions but
+    # TODO: Realistically we should also test all the other conditions but
     # its a little complex and this should hopefully be tested by the
     # full integration test

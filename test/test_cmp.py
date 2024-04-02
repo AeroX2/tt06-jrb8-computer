@@ -23,6 +23,7 @@ async def setup(dut):
 async def test_cmp_sanity(dut):
     cmp, clk = await setup(dut)
 
+    cmp.we.value = 0
     await ClockCycles(clk, 10)
 
     assert cmp.zflag.value == 0

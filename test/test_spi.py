@@ -146,7 +146,7 @@ async def test_serial_ram_in(dut):
     spi.address.value = mar_value
 
     databus_value = random.randint(0, 255)
-    spi.databus.value = databus_value
+    spi.databus.value = Force(databus_value)
     await ClockCycles(clk, 100)  # We should be able to wait here forever until ready
     assert spi.spi_state.value == IDLE
     assert spi.cs.value == 1

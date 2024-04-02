@@ -75,7 +75,7 @@ module alu(
 	end
 
 	// Constant selects not support in always_comb
-	wire [2:0] cselect = val[7:6];
+	wire [1:0] cselect = val[7:6];
 	logic [7:0] muxoutput;
 	always_comb begin
 		case (cselect)
@@ -83,6 +83,7 @@ module alu(
 			1: muxoutput = anded;
 			2: muxoutput = mult_split;
 			3: muxoutput = div;
+			default: muxoutput = 0;
 		endcase
 	end
 		

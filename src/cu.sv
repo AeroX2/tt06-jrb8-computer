@@ -6,6 +6,9 @@ module cu(
 	input spi_done,
 	output logic spi_executing,
 
+	input alu_done,
+	output logic alu_executing,
+
 	input [7:0] irin,
 
 	input pcinflag,
@@ -47,6 +50,11 @@ module cu(
 						flags_noc[9] ||
 						flags_noc[10];
 
+	wire aluo = flags_noc[1] ||
+		flags_noc[2] ||
+		flags_noc[3] ||
+		flags_noc[4];
+
 	always_ff @(negedge clk, posedge rst) begin
 		if (rst) begin
 			pc_reg <= 0;
@@ -73,8 +81,13 @@ module cu(
 					end
 
 					if (rom_or_ram_state_change) begin
-						spi_executing <= 1;
-						cu_state <= FLAGS_1_SPI;
+						if (aluo) begin
+							alu_executing <= 1;
+							if (alu_done) begin
+								spi_executing <= 1;
+								cu_state <= FLAGS_1_SPI;
+							end
+						end
 					end else begin
 						cu_state <= FLAGS_1_EVENTS;
 					end
@@ -95,8 +108,13 @@ module cu(
 					end
 
 					if (rom_or_ram_state_change) begin
-						spi_executing <= 1;
-						cu_state <= FLAGS_2_SPI;
+						if (aluo) begin
+							alu_executing <= 1;
+							if (alu_done) begin
+								spi_executing <= 1;
+								cu_state <= FLAGS_2_SPI;
+							end
+						end
 					end else begin
 						cu_state <= FLAGS_2_EVENTS;
 					end

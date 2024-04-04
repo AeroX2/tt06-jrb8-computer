@@ -55,17 +55,17 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		end else if (clk) begin
 			if (mari)
 				mar <= databus;
-			if (mpagei)
+			else if (mpagei)
 				mpage <= databus;
-			if (ai)
+			else if (ai)
 				areg <= databus;
-			if (bi)
+			else if (bi)
 				breg <= databus;
-			if (ci)
+			else if (ci)
 				creg <= databus;
-			if (di)
+			else if (di)
 				dreg <= databus;
-			if (oi)
+			else if (oi)
 				oreg <= databus;
 			ireg <= ui_in;
 		end
@@ -123,6 +123,9 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 		
 		.spi_executing(spi_executing),
 		.spi_done(spi_done),
+
+		.alu_executing(alu_executing),
+		.alu_done(alu_done),
 
 		.irin(databus),
 
@@ -197,9 +200,13 @@ module tt_um_aerox2_jrb8_computer #( parameter MAX_COUNT = 24'd10_000_000 ) (
 	wire overout;
 	wire carryout;
 	wire cmpo;
+	wire alu_executing;
+	wire alu_done;
 	alu alu_module(
 		.clk(clk),
 		.rst(rst),
+		.start(alu_executing),
+		.done(alu_done),
 		.a(a_alu_in),
 		.b(b_alu_in),
 		.carryin(cflag),

@@ -66,6 +66,7 @@ module cu (
   always_ff @(posedge clk, posedge rst) begin
     if (rst) begin
       pc_reg <= 0;
+      ir_reg <= 0;
       cu_state <= UPDATE_SPI;
 
       spi_done_reg <= 1;
@@ -77,6 +78,9 @@ module cu (
       alu_done_reg <= alu_done;
 
       case (cu_state)
+        UPDATE_IR: begin
+          ir_reg <= irin;
+        end
         FLAGS_1, FLAGS_2: begin
           // If PCC is set, count the clock.
           if (pcc) pc_reg <= pc_reg + 1;
@@ -93,7 +97,6 @@ module cu (
     spi_executing = 0;
     alu_executing = 0;
 
-    ir_reg = irin;
     cu_next_state = UPDATE_SPI;
 
     case (cu_state)
@@ -109,9 +112,7 @@ module cu (
       end
       FLAGS_1_ALU: begin
         alu_executing = alu_done_reg;
-        cu_next_state = State'(alu_done && !alu_done_reg ? FLAGS_1_ALU : (
-              rom_or_ram_state_change ? FLAGS_1_SPI : FLAGS_1_EVENTS
-            ));
+        cu_next_state = State'(alu_done && !alu_done_reg ? (rom_or_ram_state_change ? FLAGS_1_SPI : FLAGS_1_EVENTS) : FLAGS_1_ALU);
       end
       FLAGS_1_SPI: begin
         spi_executing = spi_done_reg;
@@ -121,7 +122,7 @@ module cu (
         cu_next_state = FLAGS_2;
       end
       FLAGS_2: begin
-        cu_next_state = State'(aluo ? FLAGS_2_ALU : (rom_or_ram_state_change ? FLAGS_2_SPI : FLAGS_2_EVENTS));
+        cu_next_state = State'(alu_done && !alu_done_reg ? (rom_or_ram_state_change ? FLAGS_2_SPI : FLAGS_2_EVENTS) : FLAGS_2_ALU);
       end
       FLAGS_2_ALU: begin
         alu_executing = alu_done_reg;

@@ -122,10 +122,8 @@ async def test_alu_additions_2(dut):
     # Test without overflow
     a, b = gen_rand(lambda a, b: a + b > -127 and a + b < 127)
 
-    a = ~a + 1 if a < 0 else a
-    b = ~b + 1 if b < 0 else b
-    alu.a.value = Force(a)
-    alu.b.value = Force(b)
+    alu.a.value = Force(a + 1<<8 if a < 0 else a)
+    alu.b.value = Force(b + 1<<8 if b < 0 else b)
 
     await test(alu, clk, [0x5C, 0x5D, 0x5E], [a + b, a + b, a + b])
     await test(alu, clk, [0x5F, 0x60, 0x61], [b + a, b + a, b + a])

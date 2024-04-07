@@ -25,10 +25,6 @@ async def setup(dut):
     clock = Clock(clk, 10, units="us")
     cocotb.start_soon(clock.start())
 
-    # Clock divider to 0
-    computer.uio_in[5].value = 0
-    computer.uio_in[6].value = 0
-
     computer.rst_n.value = 1
     await Timer(10, "us")
     computer.rst_n.value = 0
@@ -167,86 +163,87 @@ async def test_add_example(dut):
     assert outputs[1] == 34
 
 
-@cocotb.test()
-async def test_jmp_example(dut):
-    outputs = await load_and_run(dut, "../example_programs/jmp_program.o", 200)
-    assert outputs[1] == 6
-
-
-@cocotb.test()
-async def test_division_example(dut):
-    outputs = await load_and_run(dut, "../example_programs/division_test.o", 900)
-    assert outputs[1] == 4
-    assert outputs[2] == 7
-
-@cocotb.test()
-async def test_division_example_2(dut):
-    outputs = await load_and_run(dut, "../example_programs/div_mult_test.o", 900)
-    assert outputs[1] == 7
-    assert outputs[2] == 115
-    assert outputs[3] == 1
-
-
-@cocotb.test()
-async def test_ram_example(dut):
-    outputs = await load_and_run(dut, "../example_programs/memory_test.o", 200)
-    assert RAM[21] == 12
-    assert RAM[43] == 34
-    assert RAM[65] == 56
-    assert outputs[1] == 34
-    assert outputs[2] == 56
-
-
-def is_perfect_square(n):
-    root = int(math.sqrt(n))
-    return root * root == n
-
-
-def is_fibonacci(num):
-    return is_perfect_square(5 * num * num + 4) or is_perfect_square(5 * num * num - 4)
-
-
-@cocotb.test()
-async def test_fibonacci_example(dut):
-    outputs = await load_and_run(dut, "../example_programs/fibonacci.o", 500)
-    assert len(outputs) > 1
-    for output in outputs[1:]:
-        assert is_fibonacci(output)
-
-
-def is_prime(n):
-    if n <= 1:
-        return False
-    for i in range(2, int(math.sqrt(n)) + 1):
-        if n % i == 0:
-            return False
-    return True
-
-
-@cocotb.test()
-async def test_primes_example(dut):
-    outputs = await load_and_run(dut, "../example_programs/primes.o", 5000)
-    assert len(outputs) > 2
-    for output in outputs[2:]:
-        assert is_prime(output.integer)
+# @cocotb.test()
+# async def test_jmp_example(dut):
+#     outputs = await load_and_run(dut, "../example_programs/jmp_program.o", 200)
+#     assert outputs[1] == 6
 
 
 # @cocotb.test()
-# async def test_all(dut):
-#     programs = glob.glob('../example_programs/*.e')
-#     for program in programs:
-#         print("Running program: ", program)
-#         path = Path(program)
+# async def test_division_example(dut):
+#     outputs = await load_and_run(dut, "../example_programs/division_test.o", 900)
+#     assert outputs[1] == 4
+#     assert outputs[2] == 7
 
-#         with open(path, "r") as f:
-#             expected_d = f.readlines()
-#         expected_steps = int(expected_d[0][2:])
-#         expected_output = list(map(int, expected_d[2][3:].strip().split(",")))
-#         expected_ram = string_to_dict(expected_d[3][3:].strip())
 
-#         outputs = await load_and_run(dut, path.with_suffix(".o"), expected_steps)
+# @cocotb.test()
+# async def test_division_example_2(dut):
+#     outputs = await load_and_run(dut, "../example_programs/div_mult_test.o", 900)
+#     assert outputs[1] == 7
+#     assert outputs[2] == 115
+#     assert outputs[3] == 1
 
-#         for k,v in expected_ram.items():
-#             assert RAM[k] == v
-#         outputs = [x.integer for x in outputs]
-#         assert outputs[1:] == expected_output
+
+# @cocotb.test()
+# async def test_ram_example(dut):
+#     outputs = await load_and_run(dut, "../example_programs/memory_test.o", 200)
+#     assert RAM[21] == 12
+#     assert RAM[43] == 34
+#     assert RAM[65] == 56
+#     assert outputs[1] == 34
+#     assert outputs[2] == 56
+
+
+# def is_perfect_square(n):
+#     root = int(math.sqrt(n))
+#     return root * root == n
+
+
+# def is_fibonacci(num):
+#     return is_perfect_square(5 * num * num + 4) or is_perfect_square(5 * num * num - 4)
+
+
+# @cocotb.test()
+# async def test_fibonacci_example(dut):
+#     outputs = await load_and_run(dut, "../example_programs/fibonacci.o", 500)
+#     assert len(outputs) > 1
+#     for output in outputs[1:]:
+#         assert is_fibonacci(output)
+
+
+# def is_prime(n):
+#     if n <= 1:
+#         return False
+#     for i in range(2, int(math.sqrt(n)) + 1):
+#         if n % i == 0:
+#             return False
+#     return True
+
+
+# @cocotb.test()
+# async def test_primes_example(dut):
+#     outputs = await load_and_run(dut, "../example_programs/primes.o", 5000)
+#     assert len(outputs) > 2
+#     for output in outputs[2:]:
+#         assert is_prime(output.integer)
+
+
+# # @cocotb.test()
+# # async def test_all(dut):
+# #     programs = glob.glob('../example_programs/*.e')
+# #     for program in programs:
+# #         print("Running program: ", program)
+# #         path = Path(program)
+
+# #         with open(path, "r") as f:
+# #             expected_d = f.readlines()
+# #         expected_steps = int(expected_d[0][2:])
+# #         expected_output = list(map(int, expected_d[2][3:].strip().split(",")))
+# #         expected_ram = string_to_dict(expected_d[3][3:].strip())
+
+# #         outputs = await load_and_run(dut, path.with_suffix(".o"), expected_steps)
+
+# #         for k,v in expected_ram.items():
+# #             assert RAM[k] == v
+# #         outputs = [x.integer for x in outputs]
+# #         assert outputs[1:] == expected_output

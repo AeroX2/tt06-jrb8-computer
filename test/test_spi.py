@@ -40,7 +40,7 @@ async def test_serial_rom_out(dut):
     assert spi.mosi.value == 0
 
     pc_value = random.randint(0, 65535)
-    spi.address.value = pc_value
+    spi.address.value = Force(pc_value)
     await ClockCycles(clk, 100)
 
     spi.start.value = Force(1)
@@ -50,6 +50,7 @@ async def test_serial_rom_out(dut):
     assert spi.cs.value == 0
     assert spi.mosi.value == 0
     assert spi.done.value == 0
+    spi.start.value = Force(0)
 
     output = 0
     for i in range(8):
@@ -58,8 +59,7 @@ async def test_serial_rom_out(dut):
     assert output == 0x03  # SPI Read command is 0x03
 
     await FallingEdge(spi.sclk)
-    await Timer(1)  # `<=` causes a slight delay, wait for it
-    assert spi.spi_state.value == SEND_ADDRESS
+    assert spi.spi_next_state.value == SEND_ADDRESS
 
     output = 0
     for i in range(16):
@@ -68,19 +68,17 @@ async def test_serial_rom_out(dut):
     assert bin(output) == bin(pc_value)
 
     await FallingEdge(spi.sclk)
-    await Timer(1)  # `<=` causes a slight delay, wait for it
-    assert spi.spi_state.value == RECEIVE_DATA
+    assert spi.spi_next_state.value == RECEIVE_DATA
 
     input = random.randint(0, 255)
     for i in range(8):
         await RisingEdge(spi.sclk)
         spi.miso.value = (input >> (7 - i)) & 1
 
-    await FallingEdge(spi.done)
+    await RisingEdge(spi.done)
     assert bin(spi.data.value.integer) == bin(input)
 
     # Make sure SPI isn't triggering multiple times.
-    spi.start.value = Force(0)
     await ClockCycles(clk, 100)
     assert spi.spi_state.value == IDLE
 
@@ -90,7 +88,7 @@ async def test_serial_ram_out(dut):
     spi, clk = await setup(dut)
 
     mar_value = random.randint(0, 65535)
-    spi.address.value = mar_value
+    spi.address.value = Force(mar_value)
     await ClockCycles(clk, 100)  # We should be able to wait here forever until ready
     assert spi.spi_state.value == IDLE
     assert spi.cs.value == 1
@@ -103,6 +101,7 @@ async def test_serial_ram_out(dut):
     assert spi.cs.value == 0
     assert spi.mosi.value == 0
     assert spi.done.value == 0
+    spi.start.value = Force(0)
 
     output = 0
     for i in range(8):
@@ -111,8 +110,7 @@ async def test_serial_ram_out(dut):
     assert output == 0x03  # SPI Read command is 0x03
 
     await FallingEdge(spi.sclk)
-    await Timer(1)  # `<=` causes a slight delay, wait for it
-    assert spi.spi_state.value == SEND_ADDRESS
+    assert spi.spi_next_state.value == SEND_ADDRESS
 
     output = 0
     for i in range(16):
@@ -121,19 +119,17 @@ async def test_serial_ram_out(dut):
     assert bin(output) == bin(mar_value)
 
     await FallingEdge(spi.sclk)
-    await Timer(1)  # `<=` causes a slight delay, wait for it
-    assert spi.spi_state.value == RECEIVE_DATA
+    assert spi.spi_next_state.value == RECEIVE_DATA
 
     input = random.randint(0, 255)
     for i in range(8):
         await RisingEdge(spi.sclk)
         spi.miso.value = (input >> (7 - i)) & 1
 
-    await FallingEdge(spi.done)
+    await RisingEdge(spi.done)
     assert bin(spi.data.value.integer) == bin(input)
 
     # Make sure SPI isn't triggering multiple times.
-    spi.start.value = Force(0)
     await ClockCycles(clk, 100)
     assert spi.spi_state.value == IDLE
 
@@ -143,7 +139,7 @@ async def test_serial_ram_in(dut):
     spi, clk = await setup(dut)
 
     mar_value = random.randint(0, 65535)
-    spi.address.value = mar_value
+    spi.address.value = Force(mar_value)
 
     databus_value = random.randint(0, 255)
     spi.databus.value = Force(databus_value)
@@ -160,6 +156,7 @@ async def test_serial_ram_in(dut):
     assert spi.cs.value == 0
     assert spi.mosi.value == 0
     assert spi.done.value == 0
+    spi.start.value = Force(0)
 
     output = 0
     for i in range(8):
@@ -169,7 +166,7 @@ async def test_serial_ram_in(dut):
 
     await FallingEdge(spi.sclk)
     await Timer(1)  # `<=` causes a slight delay, wait for it
-    assert spi.spi_state.value == SEND_ADDRESS
+    assert spi.spi_next_state.value == SEND_ADDRESS
 
     output = 0
     for i in range(16):
@@ -179,16 +176,15 @@ async def test_serial_ram_in(dut):
 
     await FallingEdge(spi.sclk)
     await Timer(1)  # `<=` causes a slight delay, wait for it
-    assert spi.spi_state.value == SEND_DATA
+    assert spi.spi_next_state.value == SEND_DATA
 
     output = 0
     for i in range(8):
         await RisingEdge(spi.sclk)
         output |= spi.mosi.value.integer << (7 - i)
 
-    await FallingEdge(spi.done)
+    await RisingEdge(spi.done)
     assert bin(output) == bin(databus_value)
 
-    spi.start.value = Force(0)
     await ClockCycles(clk, 100)
     assert spi.spi_state.value == IDLE

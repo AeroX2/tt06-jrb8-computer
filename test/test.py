@@ -1,5 +1,5 @@
-from test_alu import *
 from test_cmp import *
+from test_alu import *
 from test_jmp import *
 from test_spi import *
 

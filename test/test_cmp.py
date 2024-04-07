@@ -2,6 +2,7 @@ import cocotb
 import random
 from cocotb.clock import Clock
 from cocotb.triggers import Timer, ClockCycles
+from cocotb.handle import Force
 
 
 async def setup(dut):
@@ -23,7 +24,7 @@ async def setup(dut):
 async def test_cmp_sanity(dut):
     cmp, clk = await setup(dut)
 
-    cmp.we.value = 0
+    cmp.we.value = Force(0)
     await ClockCycles(clk, 10)
 
     assert cmp.zflag.value == 0
@@ -37,20 +38,20 @@ async def test_cmp_values_set(dut):
     cmp, clk = await setup(dut)
 
     await ClockCycles(clk, 10)
-    cmp.we.value = 1
+    cmp.we.value = Force(1)
 
-    cmp.carry.value = 1
+    cmp.carry.value = Force(1)
     await ClockCycles(clk, 2)
     assert cmp.cflag.value == 1
 
-    cmp.overflow.value = 1
+    cmp.overflow.value = Force(1)
     await ClockCycles(clk, 2)
-    assert cmp.cflag.value == 1
+    assert cmp.oflag.value == 1
 
-    cmp.cmpin.value = 0
+    cmp.cmpin.value = Force(0)
     await ClockCycles(clk, 2)
     assert cmp.zflag.value == 1
 
-    cmp.cmpin.value = random.randint(-127, -1)
+    cmp.cmpin.value = Force(random.randint(-127, -1))
     await ClockCycles(clk, 2)
     assert cmp.sflag.value == 1

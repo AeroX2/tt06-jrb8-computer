@@ -22,7 +22,7 @@ async def setup(dut):
 
 async def jmp_tick(jmp, clk):
     pc_value_high = random.randint(0, 255)
-    jmp.highbits_we.value = 1
+    jmp.highbits_we.value = Force(1)
     jmp.databus.value = Force(pc_value_high)
     await ClockCycles(clk, 1)
     await Timer(1)
@@ -30,10 +30,10 @@ async def jmp_tick(jmp, clk):
     assert jmp.highbits.value == pc_value_high
 
     pc_value_low = random.randint(0, 255)
-    jmp.highbits_we.value = 0
+    jmp.highbits_we.value = Force(0)
     jmp.databus.value = Force(pc_value_low)
 
-    jmp.oe.value = 1
+    jmp.oe.value = Force(1)
     await ClockCycles(clk, 1)
 
     return pc_value_high << 8 | pc_value_low
@@ -43,7 +43,7 @@ async def jmp_tick(jmp, clk):
 async def test_jmp_sanity(dut):
     jmp, clk = await setup(dut)
 
-    jmp.oe.value = 0
+    jmp.oe.value = Force(0)
     await ClockCycles(clk, 10)
 
     assert jmp.pcoe.value == 0
@@ -55,7 +55,7 @@ async def test_jmp_jumps_correctly(dut):
     jmp, clk = await setup(dut)
 
     # No condition, always jump
-    jmp.cins.value = 0x20
+    jmp.cins.value = Force(0x20)
     pc_out = await jmp_tick(jmp, clk)
     assert jmp.pcoe.value == 1
     assert jmp.pcout.value == pc_out
@@ -66,22 +66,22 @@ async def test_jmp_conditions(dut):
     jmp, clk = await setup(dut)
 
     # = condition
-    jmp.cins.value = 0x21
-    jmp.zflag.value = 1
+    jmp.cins.value = Force(0x21)
+    jmp.zflag.value = Force(1)
     await ClockCycles(clk, 1)
     assert jmp.pcoe.value == 1
-    jmp.cins.value = 0x21
-    jmp.zflag.value = 0
+    jmp.cins.value = Force(0x21)
+    jmp.zflag.value = Force(0)
     await ClockCycles(clk, 1)
     assert jmp.pcoe.value == 0
 
     # != condition
-    jmp.cins.value = 0x22
-    jmp.zflag.value = 1
+    jmp.cins.value = Force(0x22)
+    jmp.zflag.value = Force(1)
     await ClockCycles(clk, 1)
     assert jmp.pcoe.value == 0
-    jmp.cins.value = 0x22
-    jmp.zflag.value = 0
+    jmp.cins.value = Force(0x22)
+    jmp.zflag.value = Force(0)
     await ClockCycles(clk, 1)
     assert jmp.pcoe.value == 1
 

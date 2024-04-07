@@ -50,8 +50,8 @@ pinout:
   uio[2]: "miso"
   uio[3]: "sck"
   uio[4]: "cs ram"
-  uio[5]: "clock divider bit 0"
-  uio[6]: "clock divider bit 1"
+  uio[5]: ""
+  uio[6]: ""
   uio[7]: ""
 
 # Do not change!

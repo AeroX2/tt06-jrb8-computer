@@ -26,11 +26,11 @@ module jmp (
   wire ls = cflag;
   wire leq = cflag | zflag;
   wire lg = !(cflag | zflag);
-  wire lge = !cflag;
+  wire lge = !cflag | zflag;
   wire sls = oflag ^ sflag;
   wire sleq = (oflag ^ sflag) | zflag;
-  wire slg = !(oflag ^ sflag);
-  wire slge = (oflag ^ sflag) | !zflag;
+  wire slg = (oflag == sflag) & !zflag;
+  wire slge = (oflag == sflag) | zflag;
 
   wire [10:0] flags = {
     slge, slg, sleq, sls, lge, lg, leq, ls, neq, eq, 1'b1

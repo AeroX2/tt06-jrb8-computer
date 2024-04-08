@@ -102,37 +102,51 @@ module cu (
     case (cu_state)
       UPDATE_SPI: begin
         spi_executing = spi_done_reg;
-        cu_next_state = State'(spi_done && !spi_done_reg ? UPDATE_IR : UPDATE_SPI);
+        if (spi_done && !spi_done_reg) cu_next_state = UPDATE_IR;
+        else cu_next_state = UPDATE_SPI;
       end
       UPDATE_IR: begin
         cu_next_state = FLAGS_1;
       end
       FLAGS_1: begin
-        cu_next_state = State'(aluo ? FLAGS_1_ALU : (rom_or_ram_state_change ? FLAGS_1_SPI : FLAGS_1_EVENTS));
+        if (aluo) cu_next_state = FLAGS_1_ALU;
+        else begin
+          if (rom_or_ram_state_change) cu_next_state = FLAGS_1_SPI;
+          else cu_next_state = FLAGS_1_EVENTS;
+        end
       end
       FLAGS_1_ALU: begin
         alu_executing = alu_done_reg;
-        cu_next_state = State'(alu_done && !alu_done_reg ? (rom_or_ram_state_change ? FLAGS_1_SPI : FLAGS_1_EVENTS) : FLAGS_1_ALU);
+        if (alu_done && !alu_done_reg) begin
+          if (rom_or_ram_state_change) cu_next_state = FLAGS_1_SPI;
+          else cu_next_state = FLAGS_1_EVENTS;
+        end else cu_next_state = FLAGS_1_ALU;
       end
       FLAGS_1_SPI: begin
         spi_executing = spi_done_reg;
-        cu_next_state = State'(spi_done && !spi_done_reg ? FLAGS_1_EVENTS : FLAGS_1_SPI);
+        if (spi_done && !spi_done_reg) cu_next_state = FLAGS_1_EVENTS;
+        else cu_next_state = FLAGS_1_SPI;
       end
       FLAGS_1_EVENTS: begin
         cu_next_state = FLAGS_2;
       end
       FLAGS_2: begin
-        cu_next_state = State'(alu_done && !alu_done_reg ? (rom_or_ram_state_change ? FLAGS_2_SPI : FLAGS_2_EVENTS) : FLAGS_2_ALU);
+        if (alu_done && !alu_done_reg) begin
+          if (rom_or_ram_state_change) cu_next_state = FLAGS_2_SPI;
+          else cu_next_state = FLAGS_2_EVENTS;
+        end else cu_next_state = FLAGS_2_ALU;
       end
       FLAGS_2_ALU: begin
         alu_executing = alu_done_reg;
-        cu_next_state = State'(alu_done && !alu_done_reg ? FLAGS_2_ALU : (
-              rom_or_ram_state_change ? FLAGS_2_SPI : FLAGS_2_EVENTS
-            ));
+        if (alu_done && !alu_done_reg) begin
+          if (rom_or_ram_state_change) cu_next_state = FLAGS_2_SPI;
+          else cu_next_state = FLAGS_2_EVENTS;
+        end else cu_next_state = FLAGS_2_ALU;
       end
       FLAGS_2_SPI: begin
         spi_executing = spi_done_reg;
-        cu_next_state = State'(spi_done && !spi_done_reg ? FLAGS_2_EVENTS : FLAGS_2_SPI);
+        if (spi_done && !spi_done_reg) cu_next_state = FLAGS_2_EVENTS;
+        else cu_next_state = FLAGS_2_SPI;
       end
       FLAGS_2_EVENTS: begin
         cu_next_state = UPDATE_SPI;

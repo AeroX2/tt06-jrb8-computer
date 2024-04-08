@@ -108,23 +108,31 @@ module spi (
 
     case (spi_state)
       IDLE: begin
-        spi_next_state = State'(start ? SEND_COMMAND : IDLE);
+        if (start) spi_next_state = SEND_COMMAND;
+        else spi_next_state = IDLE;
       end
       SEND_COMMAND: begin
         if (write) mosi_reg = WRITE_COMMAND;
         else mosi_reg = READ_COMMAND;
-        spi_next_state = State'((shift_counter == 0 && sclk) ? SEND_ADDRESS : SEND_COMMAND);
+        if ((shift_counter == 0 && sclk))
+          spi_next_state = SEND_ADDRESS;
+        else spi_next_state = SEND_COMMAND;
       end
       SEND_ADDRESS: begin
         mosi_reg = address;
-        spi_next_state = State'((shift_counter == 0 && sclk) ? ((write) ? SEND_DATA : RECEIVE_DATA) : SEND_ADDRESS);
+        if ((shift_counter == 0 && sclk)) begin
+          if (write) spi_next_state = SEND_DATA;
+          else spi_next_state = RECEIVE_DATA;
+        end else spi_next_state = SEND_ADDRESS;
       end
       SEND_DATA: begin
         mosi_reg = {8'h00, databus};
-        spi_next_state = State'((shift_counter == 0 && sclk) ? IDLE : SEND_DATA);
+        if ((shift_counter == 0 && sclk)) spi_next_state = IDLE;
+        else spi_next_state = SEND_DATA;
       end
       RECEIVE_DATA: begin
-        spi_next_state = State'((shift_counter == 0 && sclk) ? IDLE : RECEIVE_DATA);
+        if ((shift_counter == 0 && sclk)) spi_next_state = IDLE;
+        else spi_next_state = RECEIVE_DATA;
       end
     endcase
   end

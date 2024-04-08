@@ -109,7 +109,7 @@ module alu (
           xorb <= bandz ^ {8{ib}};
         end
         SUM: begin
-          full_sum = xora + xorb + (po ? 1 : 0) + {9{8'b0, carried}};
+          full_sum = xora + xorb + {9{8'b0, po}} + {9{8'b0, carried}};
           muxoutput <= full_sum[7:0];
         end
         AND: begin
@@ -141,7 +141,10 @@ module alu (
 
     case (state)
       IDLE: begin
-        next_state = State'(start ? DECODE : IDLE);
+        if (start)
+          next_state = DECODE;
+        else
+          next_state = IDLE;
       end
       DECODE: begin
         next_state = ANDZ;

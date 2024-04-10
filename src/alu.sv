@@ -25,14 +25,14 @@ module alu (
   localparam SIGN_OFF_INS = 'h43;
   localparam SIGN_ON_INS = 'h44;
 
-  reg [8:0] alu_rom[0:255];
+  reg [9:0] alu_rom[0:255];
   initial begin
     $readmemh("../rom/alu_rom.mem", alu_rom);
   end
 
   logic done_reg;
 
-  logic [8:0] val;
+  logic [9:0] val;
   wire za = val[0];
   wire ia = val[1];
   wire zb = val[2];
@@ -40,7 +40,8 @@ module alu (
   wire io = val[4];
   wire po = val[5];
   wire high = val[6];
-  wire [1:0] cselect = val[8:7];
+  wire cmp = val[7];
+  wire [1:0] cselect = val[9:8];
 
   logic [7:0] aandz;
   logic [7:0] bandz;
@@ -85,17 +86,26 @@ module alu (
       xora <= 0;
       xorb <= 0;
 
+      full_sum = 0;
       muxoutput <= 0;
     end else if (clk) begin
       state <= next_state;
       case (state)
         IDLE: begin
-          done_reg <= 1;
-          if (cins == CMP_OFF_INS) cmp_mode <= 0;
-          else if (cins == CMP_ON_INS) cmp_mode <= 1;
-          else if (cins == SIGN_OFF_INS) signed_mode <= 0;
-          else if (cins == SIGN_ON_INS) signed_mode <= 1;
-          else if (start) done_reg <= 0;
+          if (cins == CMP_OFF_INS) begin
+            done_reg <= ~done_reg;
+            cmp_mode <= 0;
+          end else if (cins == CMP_ON_INS) begin
+            done_reg <= ~done_reg;
+            cmp_mode <= 1;
+          end else if (cins == SIGN_OFF_INS) begin
+            done_reg <= ~done_reg;
+            signed_mode <= 0;
+          end else if (cins == SIGN_ON_INS) begin
+            done_reg <= ~done_reg;
+            signed_mode <= 1;
+          end else if (start) done_reg <= 0;
+          else done_reg <= 1;
         end
         DECODE: begin
           val <= alu_rom[cins];
@@ -109,7 +119,7 @@ module alu (
           xorb <= bandz ^ {8{ib}};
         end
         SUM: begin
-          full_sum = xora + xorb + {9{8'b0, po}} + {9{8'b0, carried}};
+          full_sum = xora + xorb + {8'b0, po} + {8'b0, (cmp_mode && cmp) ? carried : 1'b0};
           muxoutput <= full_sum[7:0];
         end
         AND: begin
@@ -141,10 +151,8 @@ module alu (
 
     case (state)
       IDLE: begin
-        if (start)
-          next_state = DECODE;
-        else
-          next_state = IDLE;
+        if (start) next_state = DECODE;
+        else next_state = IDLE;
       end
       DECODE: begin
         next_state = ANDZ;
@@ -179,7 +187,7 @@ module alu (
   end
 
   assign aluout = oe ? muxoutput : 0;
-  assign cmpo = oe || cmp_mode || cins == CLR_CMP_INS;
+  assign cmpo = (cmp || cins == CLR_CMP_INS) && state == INVERT;
   assign carryout = cselect == 0 ? full_sum[8] : 0;
   assign overout = ((~muxoutput[7]) & xora[7] & xorb[7]) | (muxoutput[7] & ~xora[7] & ~xorb[7]);
 endmodule

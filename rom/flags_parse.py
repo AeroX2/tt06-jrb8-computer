@@ -33,7 +33,7 @@ else:
 c = list(csv.reader(f))
 f.close()
 
-cl = [x[9] for x in c]
+cl = [x[10] for x in c]
 f = open("alu_rom.mem", "w")
 f.write(" ".join(cl[1:]))
 f.close()

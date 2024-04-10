@@ -131,10 +131,11 @@ module cu (
         cu_next_state = FLAGS_2;
       end
       FLAGS_2: begin
-        if (alu_done && !alu_done_reg) begin
+        if (aluo) cu_next_state = FLAGS_2_ALU;
+        else begin
           if (rom_or_ram_state_change) cu_next_state = FLAGS_2_SPI;
           else cu_next_state = FLAGS_2_EVENTS;
-        end else cu_next_state = FLAGS_2_ALU;
+        end
       end
       FLAGS_2_ALU: begin
         alu_executing = alu_done_reg;

@@ -55,7 +55,7 @@ async def test_jmp_jumps_correctly(dut):
     jmp, clk = await setup(dut)
 
     # No condition, always jump
-    jmp.cins.value = Force(0x20)
+    jmp.cins.value = Force(0x30)
     pc_out = await jmp_tick(jmp, clk)
     assert jmp.pcoe.value == 1
     assert jmp.pcout.value == pc_out
@@ -66,21 +66,21 @@ async def test_jmp_conditions(dut):
     jmp, clk = await setup(dut)
 
     # = condition
-    jmp.cins.value = Force(0x21)
+    jmp.cins.value = Force(0x31)
     jmp.zflag.value = Force(1)
     await ClockCycles(clk, 1)
     assert jmp.pcoe.value == 1
-    jmp.cins.value = Force(0x21)
+    jmp.cins.value = Force(0x31)
     jmp.zflag.value = Force(0)
     await ClockCycles(clk, 1)
     assert jmp.pcoe.value == 0
 
     # != condition
-    jmp.cins.value = Force(0x22)
+    jmp.cins.value = Force(0x32)
     jmp.zflag.value = Force(1)
     await ClockCycles(clk, 1)
     assert jmp.pcoe.value == 0
-    jmp.cins.value = Force(0x22)
+    jmp.cins.value = Force(0x32)
     jmp.zflag.value = Force(0)
     await ClockCycles(clk, 1)
     assert jmp.pcoe.value == 1

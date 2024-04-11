@@ -10,7 +10,7 @@ mov c a
 opp a-b
 cmp a d
 jmp = nextprime
-jmp .< divide
+jmp .> divide
 
 opp b+1
 cmp b c

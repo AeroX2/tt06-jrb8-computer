@@ -19,11 +19,11 @@ module alu (
     output overout,
     output cmpo
 );
-  localparam CLR_CMP_INS = 'h40;
-  localparam CMP_OFF_INS = 'h41;
-  localparam CMP_ON_INS = 'h42;
-  localparam SIGN_OFF_INS = 'h43;
-  localparam SIGN_ON_INS = 'h44;
+  localparam CLR_CMP_INS = 'h50;
+  localparam CMP_OFF_INS = 'h51;
+  localparam CMP_ON_INS = 'h52;
+  localparam SIGN_OFF_INS = 'h53;
+  localparam SIGN_ON_INS = 'h54;
 
   reg [9:0] alu_rom[0:255];
   initial begin
@@ -188,6 +188,6 @@ module alu (
 
   assign aluout = oe ? muxoutput : 0;
   assign cmpo = (cmp || cins == CLR_CMP_INS) && state == INVERT;
-  assign carryout = cselect == 0 ? full_sum[8] : 0;
+  assign carryout = cselect == 0 ? (((ia | ib) & po) ? !full_sum[8] : full_sum[8]) : 0;
   assign overout = ((~muxoutput[7]) & xora[7] & xorb[7]) | (muxoutput[7] & ~xora[7] & ~xorb[7]);
 endmodule

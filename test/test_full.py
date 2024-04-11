@@ -193,6 +193,7 @@ async def test_ram_example(dut):
     assert outputs[1] == 34
     assert outputs[2] == 56
 
+
 @cocotb.test()
 async def test_large_numbers_example(dut):
     outputs = await load_and_run(dut, "../example_programs/large_numbers.o", 3000)
@@ -202,8 +203,8 @@ async def test_large_numbers_example(dut):
 
     a = 1234 * 5678
     assert outputs[3] == a & 0xFF
-    assert outputs[4] == (a>>8) & 0xFF
-    assert outputs[5] == (a>>16) & 0xFF
+    assert outputs[4] == (a >> 8) & 0xFF
+    assert outputs[5] == (a >> 16) & 0xFF
 
 
 def is_perfect_square(n):

@@ -120,8 +120,7 @@ async def test_alu_additions_2(dut):
     alu, clk, a, b = await setup(dut)
 
     # Test without overflow
-    a, b = gen_rand(lambda a, b: a + b > -127 and a + b < 127)
-
+    a, b = gen_rand(lambda a, b: a + b >= -128 and a + b <= 127)
     alu.a.value = Force(a)
     alu.b.value = Force(b)
 
@@ -130,9 +129,9 @@ async def test_alu_additions_2(dut):
     await test(alu, clk, [0x72, 0x73, 0x74], [b + a, b + a, b + a])
     await test(alu, clk, [0x75, 0x76, 0x77], [b + a, b + a, b + a])
 
-    # TODO Test a+b carry?
-    alu.a.value = Force((a + 1 << 8) & 0xFF if a < 0 else a)
-    alu.b.value = Force((b + 1 << 8) & 0xFF if b < 0 else b)
+    a, b = gen_rand(lambda a, b: a - b >= -128 and a - b <= 127)
+    alu.a.value = Force(a)
+    alu.b.value = Force(b)
 
     await test(alu, clk, [0x78, 0x79, 0x7A], [a - b, a - b, a - b])
     await test(alu, clk, [0x7B, 0x7C, 0x7D], [a - b, a - b, a - b])

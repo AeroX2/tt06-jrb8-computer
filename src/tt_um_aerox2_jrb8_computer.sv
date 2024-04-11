@@ -105,10 +105,10 @@ module tt_um_aerox2_jrb8_computer #(
 
   // CU decoding the instruction
   wire io = flags[0];
-  wire ao = flags[1] || (flags_noc[1]);// && rami_noc);
-  wire bo = flags[2] || (flags_noc[2]);// && rami_noc);
-  wire co = flags[3] || (flags_noc[3]);// && rami_noc);
-  wire doo = flags[4] || (flags_noc[4]);// && rami_noc);
+  wire ao = flags[1] || (flags_noc[1]);  // && rami_noc);
+  wire bo = flags[2] || (flags_noc[2]);  // && rami_noc);
+  wire co = flags[3] || (flags_noc[3]);  // && rami_noc);
+  wire doo = flags[4] || (flags_noc[4]);  // && rami_noc);
   wire ao2 = flags[5] || (flags_noc[5]);
   wire bo2 = flags[6] || (flags_noc[6]);
   wire co2 = flags[7] || (flags_noc[7]);

@@ -37,7 +37,7 @@ def check_save(args):
 operations = {
     "nop": lambda x: x == "",
     "mov": check_mov,
-    "cmp": re.compile(r"([abcd]) ([abcd])").match,
+    "cmp": re.compile(r"([abcd]) ([abcd]|0|1|-1|255)").match,
     "jmp": re.compile(r"(\.?(<=|<|=|>|>=) [abcd])|(.+)").match,
     "jmpr": re.compile(r"(\.?(<=|<|=|>|>=) [abcd])|(.+)").match,
     "opp": re.compile(r"").match,

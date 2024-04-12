@@ -1,8 +1,6 @@
 `default_nettype none
 
-module tt_um_aerox2_jrb8_computer #(
-    parameter MAX_COUNT = 24'd10_000_000
-) (
+module tt_um_aerox2_jrb8_computer (
     input  wire [7:0] ui_in,    // Dedicated inputs - connected to the input switches
     output wire [7:0] uo_out,   // Dedicated outputs - connected to the 7 segment display
     input wire [7:0] uio_in,  // IOs: Bidirectional Input path
@@ -13,6 +11,8 @@ module tt_um_aerox2_jrb8_computer #(
     input wire rst_n  // reset_n - low to reset
 );
   wire rst = !rst_n;
+
+  wire _unused_ok = &{1'b0, ena, uio_in, 1'b0};
 
   reg [7:0] mar;
   reg [7:0] mpage;
@@ -56,14 +56,15 @@ module tt_um_aerox2_jrb8_computer #(
       dreg  <= 0;
       oreg  <= 0;
       ireg  <= 0;
-    end else if (clk && write_en) begin
-      if (mari) mar <= databus;
-      else if (mpagei) mpage <= databus;
-      else if (ai) areg <= databus;
-      else if (bi) breg <= databus;
-      else if (ci) creg <= databus;
-      else if (di) dreg <= databus;
-      else if (oi) oreg <= databus;
+    end else if (clk) begin
+      // TODO: Why does this work but clk && write_en does not?
+      if (mari && write_en) mar <= databus;
+      else if (mpagei && write_en) mpage <= databus;
+      else if (ai && write_en) areg <= databus;
+      else if (bi && write_en) breg <= databus;
+      else if (ci && write_en) creg <= databus;
+      else if (di && write_en) dreg <= databus;
+      else if (oi && write_en) oreg <= databus;
       ireg <= ui_in;
     end
   end

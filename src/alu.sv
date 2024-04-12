@@ -86,7 +86,6 @@ module alu (
       xora <= 0;
       xorb <= 0;
 
-      full_sum = 0;
       muxoutput <= 0;
     end else if (clk) begin
       state <= next_state;
@@ -119,23 +118,20 @@ module alu (
           xorb <= bandz ^ {8{ib}};
         end
         SUM: begin
-          full_sum = xora + xorb + {8'b0, po} + {8'b0, (cmp_mode && cmp) ? carried : 1'b0};
           muxoutput <= full_sum[7:0];
         end
         AND: begin
           muxoutput <= xora & xorb;
         end
         MULT: begin
-          mult = signed_mode ? $signed(xora) * $signed(xorb) :
-              xora * xorb;
           muxoutput <= high ? mult[15:8] : mult[7:0];
         end
         DIV: begin
           if (signed_mode) begin
             muxoutput <= $signed(xora) /
-                $signed((xorb == 0 ? 1 : xorb));
+                $signed((xorb == 8'h0 ? 8'h1 : xorb));
           end else begin
-            muxoutput <= xora / (xorb == 0 ? 1 : xorb);
+            muxoutput <= xora / (xorb == 8'h0 ? 8'h1 : xorb);
           end
         end
         INVERT: begin
@@ -148,6 +144,10 @@ module alu (
   always_comb begin
     done = done_reg;
     next_state = IDLE;
+
+    // TODO: Is there a way to avoid calculating this on every clock cycle?
+    mult = signed_mode ? $signed(xora) * $signed(xorb) : xora * xorb;
+    full_sum = xora + xorb + {8'b0, po} + {8'b0, (cmp_mode && cmp) ? carried : 1'b0};
 
     case (state)
       IDLE: begin
@@ -188,6 +188,8 @@ module alu (
 
   assign aluout = oe ? muxoutput : 0;
   assign cmpo = (cmp || cins == CLR_CMP_INS) && state == INVERT;
+
+  // TODO: (ia | ib) & po seems a little
   assign carryout = cselect == 0 ? (((ia | ib) & po) ? !full_sum[8] : full_sum[8]) : 0;
   assign overout = ((~muxoutput[7]) & xora[7] & xorb[7]) | (muxoutput[7] & ~xora[7] & ~xorb[7]);
 endmodule

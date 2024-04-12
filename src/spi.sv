@@ -95,7 +95,7 @@ module spi (
           sclk_reg <= ~sclk_reg;
           if (sclk_reg) begin
             shift_counter <= shift_counter - 1;
-            data_reg[shift_counter] <= miso;
+            data_reg[shift_counter[2:0]] <= miso;
           end
         end
       endcase

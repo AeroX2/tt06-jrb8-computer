@@ -1,7 +1,6 @@
 module cu (
     input clk,
     input rst,
-    input halt,
 
     input spi_done,
     output logic spi_executing,
@@ -14,14 +13,15 @@ module cu (
     input pcinflag,
     input [15:0] pcin,
     output logic [15:0] pc,
+    output logic write_en,
     output logic highbits_we,
 
-    output logic [21:0] flags,
-    output logic [21:0] flags_noc,
+    output logic [ 9:0] input_flags,
+    output logic [11:0] output_flags,
     output logic [ 7:0] cuout
 );
-  logic [7:0] cu_rom[0:255];
-  logic [7:0] cu_rom_2[0:255];
+  logic [6:0] cu_rom[0:255];
+  logic [6:0] cu_rom_2[0:255];
   logic [21:0] cu_flag_conv[0:85];
   initial begin
     $readmemh("../rom/cu_rom.mem", cu_rom);
@@ -48,17 +48,19 @@ module cu (
   logic [7:0] ir_reg;
   logic [15:0] pc_reg;
 
-  // PCC, RAMI, ROMO, RAMO
-  wire pcc = flags_noc[20];
-  wire rom_or_ram_state_change = pcc ||
-						flags_noc[13] || 
-						flags_noc[9] ||
-						flags_noc[10];
+  logic [21:0] flags;
 
-  wire aluo = flags_noc[1] ||
-		flags_noc[2] ||
-		flags_noc[3] ||
-		flags_noc[4];
+  wire halt = flags[21];
+
+  // PCC, RAMI, ROMO, RAMO
+  wire pcc = flags[20];
+  wire rom_or_ram_state_change = pcc ||
+						flags[13] || 
+						flags[9] ||
+						flags[10];
+
+  // AO, BO, CO, DO
+  wire aluo = flags[1] || flags[2] || flags[3] || flags[4];
 
   logic spi_done_reg;
   logic alu_done_reg;
@@ -159,28 +161,24 @@ module cu (
     case (cu_state)
       // Turn on PCC and ROMO
       UPDATE_SPI, UPDATE_IR: begin
-        flags_noc = 'b100000000001000000000;
+        flags = 'b100000000001000000000;
       end
       FLAGS_1, FLAGS_1_ALU, FLAGS_1_SPI, FLAGS_1_EVENTS: begin
-        flags_noc = cu_flag_conv[cu_rom[ir_reg]];
+        flags = cu_flag_conv[cu_rom[ir_reg]];
       end
       FLAGS_2, FLAGS_2_ALU, FLAGS_2_SPI, FLAGS_2_EVENTS: begin
-        flags_noc = cu_flag_conv[cu_rom_2[ir_reg]];
-      end
-
-      default: flags_noc = 0;
-    endcase
-
-    case (cu_state)
-      UPDATE_SPI, UPDATE_IR, FLAGS_1_EVENTS, FLAGS_2_EVENTS: begin
-        flags = flags_noc;
+        flags = cu_flag_conv[cu_rom_2[ir_reg]];
       end
 
       default: flags = 0;
     endcase
   end
 
+  assign input_flags = flags[21:12];
+  assign output_flags = flags[11:0];
+
   assign pc = pc_reg;
+  assign write_en = cu_state == FLAGS_1_EVENTS || cu_state == FLAGS_2_EVENTS;
   assign highbits_we = cu_state == FLAGS_1_EVENTS;
   assign cuout = ir_reg;
 endmodule

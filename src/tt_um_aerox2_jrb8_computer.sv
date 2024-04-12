@@ -56,7 +56,7 @@ module tt_um_aerox2_jrb8_computer #(
       dreg  <= 0;
       oreg  <= 0;
       ireg  <= 0;
-    end else if (clk) begin
+    end else if (clk && write_en) begin
       if (mari) mar <= databus;
       else if (mpagei) mpage <= databus;
       else if (ai) areg <= databus;
@@ -68,14 +68,9 @@ module tt_um_aerox2_jrb8_computer #(
     end
   end
 
-  logic [21:0] flags_noc;
-  wire romo_noc = flags_noc[9];
-  wire ramo_noc = flags_noc[10];
-  wire rami_noc = flags_noc[13];
-
   wire cs;
-  wire cs_rom = romo_noc ? cs : 1;
-  wire cs_ram = (rami_noc || ramo_noc) ? cs : 1;
+  wire cs_rom = romo ? cs : 1;
+  wire cs_ram = (rami || ramo) ? cs : 1;
 
   wire mosi;
   wire miso = uio_in[2];
@@ -93,8 +88,8 @@ module tt_um_aerox2_jrb8_computer #(
 
       .start(spi_executing),
       .done(spi_done),
-      .write(rami_noc),
-      .address(romo_noc ? pc : {mpage, mar}),
+      .write(rami),
+      .address(romo ? pc : {mpage, mar}),
       .data(spi_data),
 
       .sclk(sclk),
@@ -104,29 +99,29 @@ module tt_um_aerox2_jrb8_computer #(
   );
 
   // CU decoding the instruction
-  wire io = flags[0];
-  wire ao = flags[1] || (flags_noc[1]);  // && rami_noc);
-  wire bo = flags[2] || (flags_noc[2]);  // && rami_noc);
-  wire co = flags[3] || (flags_noc[3]);  // && rami_noc);
-  wire doo = flags[4] || (flags_noc[4]);  // && rami_noc);
-  wire ao2 = flags[5] || (flags_noc[5]);
-  wire bo2 = flags[6] || (flags_noc[6]);
-  wire co2 = flags[7] || (flags_noc[7]);
-  wire doo2 = flags[8] || (flags_noc[8]);
-  wire romo = flags[9];
-  wire ramo = flags[10];
-  wire jmpo = flags[11];
+  wire io = output_flags[0];
+  wire ao = output_flags[1];
+  wire bo = output_flags[2];
+  wire co = output_flags[3];
+  wire doo = output_flags[4];
+  wire ao2 = output_flags[5];
+  wire bo2 = output_flags[6];
+  wire co2 = output_flags[7];
+  wire doo2 = output_flags[8];
+  wire romo = output_flags[9];
+  wire ramo = output_flags[10];
+  wire jmpo = output_flags[11];
 
-  wire oi = flags[12];
-  // wire rami = flags[13];
-  wire mari = flags[14];
-  wire mpagei = flags[15];
-  wire ai = flags[16];
-  wire bi = flags[17];
-  wire ci = flags[18];
-  wire di = flags[19];
-  // wire pcc = flags[20];
-  wire halt = flags[21];
+  wire oi = input_flags[0];
+  wire rami = input_flags[1];
+  wire mari = input_flags[2];
+  wire mpagei = input_flags[3];
+  wire ai = input_flags[4];
+  wire bi = input_flags[5];
+  wire ci = input_flags[6];
+  wire di = input_flags[7];
+  // wire pcc = input_flags[8];
+  // wire halt = input_flags[9];
 
   // Databus
   wire [7:0] aluout;
@@ -144,15 +139,17 @@ module tt_um_aerox2_jrb8_computer #(
   wire pcinflag;
   wire [15:0] pc;
   wire [15:0] pcin;
-  logic [21:0] flags;
 
   // CU
   wire [7:0] cins;
+  wire [9:0] input_flags;
+  wire [11:0] output_flags;
+  wire write_en;
   cu cu_module (
       .clk(clk),
       .rst(rst),
-      .halt(halt),
       .highbits_we(highbits_we),
+      .write_en(write_en),
 
       .spi_executing(spi_executing),
       .spi_done(spi_done),
@@ -168,8 +165,8 @@ module tt_um_aerox2_jrb8_computer #(
       .pcin(pcin),
       .pc(pc),
 
-      .flags(flags),
-      .flags_noc(flags_noc),
+      .input_flags(input_flags),
+      .output_flags(output_flags),
       .cuout(cins)
   );
 

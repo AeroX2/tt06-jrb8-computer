@@ -8,7 +8,8 @@ module spi (
     input start,
     output logic done,
     input write,
-    input [15:0] address,
+    input [23:0] address,
+    input address_24bit,
     output logic [7:0] data,
 
     // SPI
@@ -34,12 +35,12 @@ module spi (
   // Registers
   State spi_state, spi_next_state;
 
-  logic [ 3:0] shift_counter;
+  logic [ 4:0] shift_counter;
   logic [ 7:0] data_reg;
 
   logic        done_reg;
   logic        sclk_reg;
-  logic [15:0] mosi_reg;
+  logic [23:0] mosi_reg;
 
   // State transition and control logic
   always_ff @(posedge clk, posedge rst) begin
@@ -51,7 +52,7 @@ module spi (
       shift_counter <= 0;
 
       sclk_reg <= 0;
-    end else if (clk) begin
+    end else begin
       spi_state <= spi_next_state;
       case (spi_state)
         IDLE: begin
@@ -72,7 +73,7 @@ module spi (
           if (sclk_reg) begin
             shift_counter <= shift_counter - 1;
             if (shift_counter == 0) begin
-              shift_counter <= 15;
+              shift_counter <= address_24bit ? 23 : 15;
             end
           end
         end
@@ -126,7 +127,7 @@ module spi (
         end else spi_next_state = SEND_ADDRESS;
       end
       SEND_DATA: begin
-        mosi_reg = {8'h00, databus};
+        mosi_reg = {16'h00, databus};
         if ((shift_counter == 0 && sclk)) spi_next_state = IDLE;
         else spi_next_state = SEND_DATA;
       end

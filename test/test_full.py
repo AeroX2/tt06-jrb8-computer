@@ -52,7 +52,7 @@ async def wait_for_sclk(sclk, v):
         await Timer(5, "us")
 
 
-async def send_rom_data(computer, sclk, ROM):
+async def send_rom_data(computer, sclk, ROM, address_24bit):
     read = 0
     for i in range(8):
         await wait_for_sclk(sclk, 1)
@@ -61,9 +61,10 @@ async def send_rom_data(computer, sclk, ROM):
     assert bin(read) == bin(0x3)
 
     pc = 0
-    for i in range(16):
+    v = 24 if address_24bit else 16
+    for i in range(v):
         await wait_for_sclk(sclk, 1)
-        pc |= computer.uio_out[1].value.integer << (15 - i)
+        pc |= computer.uio_out[1].value.integer << (v - 1 - i)
         await wait_for_sclk(sclk, 0)
 
     data = ROM[pc]
@@ -77,7 +78,7 @@ async def send_rom_data(computer, sclk, ROM):
     computer.uio_in[2].value = 0
 
 
-async def send_ram_data(computer, sclk):
+async def send_ram_data(computer, sclk, address_24bit):
     read_or_write = 0
     for i in range(8):
         await wait_for_sclk(sclk, 1)
@@ -86,10 +87,16 @@ async def send_ram_data(computer, sclk):
     assert bin(read_or_write) == bin(0x2) or bin(read_or_write) == bin(0x3)
 
     mar = 0
-    for i in range(16):
+    v = 24 if address_24bit else 16
+    for i in range(v):
         await wait_for_sclk(sclk, 1)
-        mar |= computer.uio_out[1].value.integer << (15 - i)
+        mar |= computer.uio_out[1].value.integer << (v - 1 - i)
         await wait_for_sclk(sclk, 0)
+
+    # In 24bit addressing mode, the RAM is placed at 0x10000
+    # so just minus it off to keeps the offsets the same.
+    if (address_24bit):
+        mar -= 0x10000
 
     if read_or_write == 0x2:
         # Write
@@ -114,24 +121,29 @@ async def send_ram_data(computer, sclk):
         computer.uio_in[2].value = 0
 
 
-async def run(dut, ROM, cycles):
+async def run(dut, ROM, cycles, address_24bit):
     computer, clk, sclk = await setup(dut)
 
     # Only for debugging
     _computer = dut.tt_um_aerox2_jrb8_computer
 
+    computer.uio_in[7].value = address_24bit
+
     outputs = []
+    previous_output = None
     for cycle in range(cycles):
         await ClockCycles(clk, 1)
 
-        if computer.uo_out.value not in outputs:
-            outputs.append(computer.uo_out.value)
+        current_output = computer.uo_out.value
+        if current_output != previous_output:
+            outputs.append(current_output)
+        previous_output = current_output
 
         try:
             if computer.uio_out[0] == 0:
-                await send_rom_data(computer, sclk, ROM)
+                await send_rom_data(computer, sclk, ROM, address_24bit)
             if computer.uio_out[4] == 0:
-                await send_ram_data(computer, sclk)
+                await send_ram_data(computer, sclk, address_24bit)
         except Exception as e:
             print(e)
             print(f"Failure at cycle: {cycle}")
@@ -141,12 +153,12 @@ async def run(dut, ROM, cycles):
     return outputs
 
 
-async def load_and_run(dut, path, steps):
+async def load_and_run(dut, path, steps, address_24bit=False):
     with open(path, "r") as f:
         program_d = f.readlines()
     program_b = [int(x, 16) for x in program_d[1].split()]
 
-    return await run(dut, program_b, steps)
+    return await run(dut, program_b, steps, address_24bit)
 
 
 def string_to_dict(s):
@@ -162,10 +174,16 @@ async def test_add_example(dut):
     outputs = await load_and_run(dut, "../example_programs/add_program.o", 100)
     assert outputs[1] == 34
 
+    outputs = await load_and_run(dut, "../example_programs/add_program.o", 100, True)
+    assert outputs[1] == 34
+
 
 @cocotb.test()
 async def test_jmp_example(dut):
     outputs = await load_and_run(dut, "../example_programs/jmp_program.o", 300)
+    assert outputs[1] == 6
+
+    outputs = await load_and_run(dut, "../example_programs/jmp_program.o", 300, True)
     assert outputs[1] == 6
 
 
@@ -175,10 +193,19 @@ async def test_division_example(dut):
     assert outputs[1] == 4
     assert outputs[2] == 7
 
+    outputs = await load_and_run(dut, "../example_programs/division_test.o", 2000, True)
+    assert outputs[1] == 4
+    assert outputs[2] == 7
+
 
 @cocotb.test()
 async def test_division_example_2(dut):
     outputs = await load_and_run(dut, "../example_programs/div_mult_test.o", 900)
+    assert outputs[1] == 7
+    assert outputs[2] == 115
+    assert outputs[3] == 1
+
+    outputs = await load_and_run(dut, "../example_programs/div_mult_test.o", 900, True)
     assert outputs[1] == 7
     assert outputs[2] == 115
     assert outputs[3] == 1
@@ -193,10 +220,27 @@ async def test_ram_example(dut):
     assert outputs[1] == 34
     assert outputs[2] == 56
 
+    outputs = await load_and_run(dut, "../example_programs/memory_test.o", 300, True)
+    assert RAM[21] == 12
+    assert RAM[43] == 34
+    assert RAM[65] == 56
+    assert outputs[1] == 34
+    assert outputs[2] == 56
+
 
 @cocotb.test()
 async def test_large_numbers_example(dut):
     outputs = await load_and_run(dut, "../example_programs/large_numbers.o", 3000)
+    a = 4567 + 1234
+    assert outputs[1] == a & 0xFF
+    assert outputs[2] == (a >> 8) & 0xFF
+
+    a = 1234 * 5678
+    assert outputs[3] == a & 0xFF
+    assert outputs[4] == (a >> 8) & 0xFF
+    assert outputs[5] == (a >> 16) & 0xFF
+
+    outputs = await load_and_run(dut, "../example_programs/large_numbers.o", 3000, True)
     a = 4567 + 1234
     assert outputs[1] == a & 0xFF
     assert outputs[2] == (a >> 8) & 0xFF
@@ -223,6 +267,11 @@ async def test_fibonacci_example(dut):
     for output in outputs[1:]:
         assert is_fibonacci(output)
 
+    outputs = await load_and_run(dut, "../example_programs/fibonacci.o", 500, True)
+    assert len(outputs) > 1
+    for output in outputs[1:]:
+        assert is_fibonacci(output)
+
 
 def is_prime(n):
     if n <= 1:
@@ -236,6 +285,11 @@ def is_prime(n):
 @cocotb.test()
 async def test_primes_example(dut):
     outputs = await load_and_run(dut, "../example_programs/primes.o", 5000)
+    assert len(outputs) > 2
+    for output in outputs[2:]:
+        assert is_prime(output.integer)
+
+    outputs = await load_and_run(dut, "../example_programs/primes.o", 5000, True)
     assert len(outputs) > 2
     for output in outputs[2:]:
         assert is_prime(output.integer)

@@ -76,6 +76,7 @@ module tt_um_aerox2_jrb8_computer (
   wire mosi;
   wire miso = uio_in[2];
   wire sclk;
+  wire address_24bit = uio_in[7];
 
   wire [7:0] spi_data;
   wire spi_executing;
@@ -90,7 +91,8 @@ module tt_um_aerox2_jrb8_computer (
       .start(spi_executing),
       .done(spi_done),
       .write(rami),
-      .address(romo ? pc : {mpage, mar}),
+      .address(romo ? {8'b0, pc} : {8'b1, mpage, mar}),
+      .address_24bit(address_24bit),
       .data(spi_data),
 
       .sclk(sclk),

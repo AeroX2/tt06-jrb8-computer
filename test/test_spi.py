@@ -16,6 +16,7 @@ async def setup(dut):
     clk = spi.clk
 
     spi.start.value = Force(0)
+    spi.address_24bit.value = Force(0)
     spi.address.value = 0
     spi.write.value = 0
 

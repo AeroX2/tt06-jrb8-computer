@@ -22,7 +22,7 @@ module cu (
 );
   logic [6:0] cu_rom[0:255];
   logic [6:0] cu_rom_2[0:255];
-  logic [21:0] cu_flag_conv[0:85];
+  logic [21:0] cu_flag_conv[0:87];
   initial begin
     $readmemh("../rom/cu_rom.mem", cu_rom);
     $readmemh("../rom/cu_rom_2.mem", cu_rom_2);

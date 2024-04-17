@@ -197,11 +197,23 @@ def string_to_dict(s):
 
 @cocotb.test()
 async def test_add_example(dut):
-    outputs = await load_and_run(dut, "../example_programs/add_program.o", 100)
+    outputs = await load_and_run(dut, "../example_programs/add_program.o", 200)
     assert outputs[1] == 34
 
-    outputs = await load_and_run(dut, "../example_programs/add_program.o", 100, True)
+    outputs = await load_and_run(dut, "../example_programs/add_program.o", 200, True)
     assert outputs[1] == 34
+
+@cocotb.test()
+async def test_output_example(dut):
+    outputs = await load_and_run(dut, "../example_programs/output.o", 200)
+    assert outputs[1] == 13
+    assert outputs[2] == 37
+    assert outputs[3] == 74
+
+    outputs = await load_and_run(dut, "../example_programs/output.o", 200, True)
+    assert outputs[1] == 13
+    assert outputs[2] == 37
+    assert outputs[3] == 74
 
 
 @cocotb.test()

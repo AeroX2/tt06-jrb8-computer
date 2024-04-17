@@ -44,7 +44,7 @@ operations = {
     "load": check_load,
     "save": check_save,
     "in": re.compile(r"[abcd]").match,
-    "out": re.compile(r"[abcd]").match,
+    "out": re.compile(r"[abcd]|[0-9]+|ram\[[0-9]+\]|ram\[[abcd]\]").match,
     "pause": lambda x: x == "",
 }
 

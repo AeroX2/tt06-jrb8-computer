@@ -52,33 +52,7 @@ async def wait_for_sclk(sclk, v):
         await Timer(5, "us")
 
 
-async def send_rom_data(computer, sclk, ROM, address_24bit):
-    read = 0
-    for i in range(8):
-        await wait_for_sclk(sclk, 1)
-        read |= computer.uio_out[1].value.integer << (7 - i)
-        await wait_for_sclk(sclk, 0)
-    assert bin(read) == bin(0x3)
-
-    pc = 0
-    v = 24 if address_24bit else 16
-    for i in range(v):
-        await wait_for_sclk(sclk, 1)
-        pc |= computer.uio_out[1].value.integer << (v - 1 - i)
-        await wait_for_sclk(sclk, 0)
-
-    data = ROM[pc]
-    print("Reading ROM from", pc, "which is", data)
-
-    for i in range(8):
-        await wait_for_sclk(sclk, 0)
-        computer.uio_in[2].value = (data >> (7 - i)) & 1
-        await wait_for_sclk(sclk, 1)
-    await wait_for_sclk(sclk, 0)
-    computer.uio_in[2].value = 0
-
-
-async def send_ram_data(computer, sclk, address_24bit):
+async def send_data(computer, sclk, ROM, address_24bit, cs_ram):
     read_or_write = 0
     for i in range(8):
         await wait_for_sclk(sclk, 1)
@@ -86,33 +60,41 @@ async def send_ram_data(computer, sclk, address_24bit):
         await wait_for_sclk(sclk, 0)
     assert bin(read_or_write) == bin(0x2) or bin(read_or_write) == bin(0x3)
 
-    mar = 0
+    address = 0
     v = 24 if address_24bit else 16
     for i in range(v):
         await wait_for_sclk(sclk, 1)
-        mar |= computer.uio_out[1].value.integer << (v - 1 - i)
+        address |= computer.uio_out[1].value.integer << (v - 1 - i)
         await wait_for_sclk(sclk, 0)
 
-    # In 24bit addressing mode, the RAM is placed at 0x10000
-    # so just minus it off to keeps the offsets the same.
-    if (address_24bit):
-        mar -= 0x10000
-
-    if read_or_write == 0x2:
-        # Write
-        data = 0
-        for i in range(8):
-            await wait_for_sclk(sclk, 1)
-            data |= computer.uio_out[1].value.integer << (7 - i)
+    if (address >= 0x10000 or cs_ram):
+        address -= 0x10000
+        if read_or_write == 0x2:
+            # Write
+            data = 0
+            for i in range(8):
+                await wait_for_sclk(sclk, 1)
+                data |= computer.uio_out[1].value.integer << (7 - i)
+                await wait_for_sclk(sclk, 0)
             await wait_for_sclk(sclk, 0)
-        await wait_for_sclk(sclk, 0)
 
-        print("Written data is", data, "at", mar)
-        RAM[mar] = data
+            print("Written data is", data, "at", address)
+            RAM[address] = data
+        else:
+            # Read
+            data = RAM[address]
+            print("Read data is", data)
+            for i in range(8):
+                await wait_for_sclk(sclk, 0)
+                computer.uio_in[2].value = (data >> (7 - i)) & 1
+                await wait_for_sclk(sclk, 1)
+            await wait_for_sclk(sclk, 0)
+            computer.uio_in[2].value = 0
     else:
-        # Read
-        data = RAM[mar]
-        print("Read data is", data)
+        assert bin(read_or_write) == bin(0x03)
+        data = ROM[address]
+        print("Reading ROM from", address, "which is", data)
+
         for i in range(8):
             await wait_for_sclk(sclk, 0)
             computer.uio_in[2].value = (data >> (7 - i)) & 1
@@ -120,6 +102,48 @@ async def send_ram_data(computer, sclk, address_24bit):
         await wait_for_sclk(sclk, 0)
         computer.uio_in[2].value = 0
 
+
+# async def send_ram_data(computer, sclk, address_24bit):
+#     read_or_write = 0
+#     for i in range(8):
+#         await wait_for_sclk(sclk, 1)
+#         read_or_write |= computer.uio_out[1].value.integer << (7 - i)
+#         await wait_for_sclk(sclk, 0)
+#     assert bin(read_or_write) == bin(0x2) or bin(read_or_write) == bin(0x3)
+
+#     mar = 0
+#     v = 24 if address_24bit else 16
+#     for i in range(v):
+#         await wait_for_sclk(sclk, 1)
+#         mar |= computer.uio_out[1].value.integer << (v - 1 - i)
+#         await wait_for_sclk(sclk, 0)
+
+#     # In 24bit addressing mode, the RAM is placed at 0x10000
+#     # so just minus it off to keeps the offsets the same.
+#     if (address_24bit):
+#         mar -= 0x10000
+
+#     if read_or_write == 0x2:
+#         # Write
+#         data = 0
+#         for i in range(8):
+#             await wait_for_sclk(sclk, 1)
+#             data |= computer.uio_out[1].value.integer << (7 - i)
+#             await wait_for_sclk(sclk, 0)
+#         await wait_for_sclk(sclk, 0)
+
+#         print("Written data is", data, "at", mar)
+#         RAM[mar] = data
+#     else:
+#         # Read
+#         data = RAM[mar]
+#         print("Read data is", data)
+#         for i in range(8):
+#             await wait_for_sclk(sclk, 0)
+#             computer.uio_in[2].value = (data >> (7 - i)) & 1
+#             await wait_for_sclk(sclk, 1)
+#         await wait_for_sclk(sclk, 0)
+#         computer.uio_in[2].value = 0
 
 async def run(dut, ROM, cycles, address_24bit):
     computer, clk, sclk = await setup(dut)
@@ -140,10 +164,12 @@ async def run(dut, ROM, cycles, address_24bit):
         previous_output = current_output
 
         try:
-            if computer.uio_out[0] == 0:
-                await send_rom_data(computer, sclk, ROM, address_24bit)
-            if computer.uio_out[4] == 0:
-                await send_ram_data(computer, sclk, address_24bit)
+            cs_rom = computer.uio_out[0] == 0
+            cs_ram = computer.uio_out[4] == 0
+
+            v = (cs_rom) if address_24bit else (cs_rom | cs_ram)
+            if (v):
+                await send_data(computer, sclk, ROM, address_24bit, cs_ram and not address_24bit)
         except Exception as e:
             print(e)
             print(f"Failure at cycle: {cycle}")

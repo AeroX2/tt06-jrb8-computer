@@ -70,7 +70,7 @@ module tt_um_aerox2_jrb8_computer (
   end
 
   wire cs;
-  wire cs_rom = romo ? cs : 1;
+  wire cs_rom = address_24bit ? ((romo || rami || ramo) ? cs : 1) : (romo ? cs : 1);
   wire cs_ram = (rami || ramo) ? cs : 1;
 
   wire mosi;

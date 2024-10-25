@@ -1,12 +1,37 @@
 # Overview
 
-This project is an 8-bit computer I originally designed in Logisim Evolution, which I am now porting to TinyTapeout for manufacturing. 
-
-Below is the general architecture of the computer, shown in Logisim Evolution. However, some modifications were made to ensure compatibility with VHDL and TinyTapeout.
+This project is an 8-bit computer I originally designed in Logisim Evolution, which I am now porting to TinyTapeout for manufacturing. Below is the computer’s general architecture as shown in Logisim Evolution; however, certain modifications were made to ensure compatibility with VHDL and TinyTapeout.
 
 ![architecture](architecture.png)
 
-The most notable change is the addition of a B register, as well as adjustments to enable ROM and RAM communication via SPI. Detailed information on these changes is provided below.
+The primary change includes the addition of a B register, alongside adjustments to enable ROM and RAM communication via SPI. Detailed information on these modifications is provided below.
+
+The computer supports the following operations:
+
+## Register Operations
+
+The computer features four main registers: `a`, `b`, `c`, and `d`. It supports:
+- Moving (`mov`) data between all registers.
+- Comparing (`cmp`) values between registers, or between a register and a constant (0, 1, -1, or 255).
+- Jumping (`jmp`) to labels and performing conditional jumps (`=`, `!=`, `<`, `<=`, `>`, `>=`) and relative jumps.
+
+## ALU Operations
+
+The ALU (Arithmetic Logic Unit) offers the following operations:
+- Bitwise NOT (`~`) and negation (`-`).
+- Increment (`+1`) and decrement (`-1`).
+- Addition (`+`) and subtraction (`-`).
+- Multiplication (`*`) and division (`/`).
+- Bitwise AND (`&`) and OR (`|`).
+- Signed mode operations and a carry flag for extended 8-bit addition/subtraction.
+
+## Memory and I/O
+
+- Load data from ROM into a register.
+- Load data from RAM into a register.
+- Save data from a register to RAM.
+- Read from the input (`in`) port.
+- Write to the output (`out`) port.
 
 # Testing the Computer
 
@@ -30,12 +55,18 @@ Below is a simple 8-bit Fibonacci program in the custom `J` format (`fibonacci.j
 load rom a 1
 load rom b 0
 :repeat
+// Store the previous in c register
 mov a c
+// a = a + b
 opp a+b
+// This also corresponds to the carry flag being set
+// So jump to start if a+b has overflowed  
 jmp < start
+// Output the value to the output pins
 out a
-mov c b
-jmp >= repeat
+// Restore the previous value in b register
+mov c b 
+jmp repeat
 ```
 
 This program, when assembled, translates to the following hexadecimal format:

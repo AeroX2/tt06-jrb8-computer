@@ -44,7 +44,7 @@ This program, when assembled, translates to the following hexadecimal format:
 d0 01 d1 00 02 6c 33 00 00 f4 08 36 00 04
 ```
 
-For a comprehensive guide on assembler instructions and their corresponding hex codes, refer to this document (https://docs.google.com/document/d/1ZVZw_Kt-KQHER0Wr5ty7JpUEeox_284Mih4rwE16FVM/edit?usp=sharing).\
+For a comprehensive guide on assembler instructions and their corresponding hex codes, refer to this document (https://docs.google.com/document/d/1ZVZw_Kt-KQHER0Wr5ty7JpUEeox_284Mih4rwE16FVM/edit?usp=sharing). \
 You can also look at `roms/cu_flags.csv` in the `tt06-jrb8-computer` repository
 
 The input register or the `i` register is mapped to `ui_in`\

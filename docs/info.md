@@ -66,7 +66,7 @@ RAM addressing is handled through two registers:
 
 # External Hardware Requirements
 
-External SPI storage is required for this computer, with mappings compatible with [spi-ram-emu](https://github.com/MichaelBell/spi-ram-emu/). The following `uio` mappings are used:
+External SPI storage is required for this computer, with mappings compatible with spi-ram-emu (https://github.com/MichaelBell/spi-ram-emu/). The following `uio` mappings are used:
 
 ```yaml
 uio[0]: "cs rom"

@@ -197,20 +197,20 @@ def string_to_dict(s):
 
 @cocotb.test()
 async def test_add_example(dut):
-    outputs = await load_and_run(dut, "../example_programs/add_program.o", 200)
+    outputs = await load_and_run(dut, "../example_programs/assembly/add_program.o", 200)
     assert outputs[1] == 34
 
-    outputs = await load_and_run(dut, "../example_programs/add_program.o", 200, True)
+    outputs = await load_and_run(dut, "../example_programs/assembly/add_program.o", 200, True)
     assert outputs[1] == 34
 
 @cocotb.test()
 async def test_output_example(dut):
-    outputs = await load_and_run(dut, "../example_programs/output.o", 200)
+    outputs = await load_and_run(dut, "../example_programs/assembly/output.o", 200)
     assert outputs[1] == 13
     assert outputs[2] == 37
     assert outputs[3] == 74
 
-    outputs = await load_and_run(dut, "../example_programs/output.o", 200, True)
+    outputs = await load_and_run(dut, "../example_programs/assembly/output.o", 200, True)
     assert outputs[1] == 13
     assert outputs[2] == 37
     assert outputs[3] == 74
@@ -218,32 +218,32 @@ async def test_output_example(dut):
 
 @cocotb.test()
 async def test_jmp_example(dut):
-    outputs = await load_and_run(dut, "../example_programs/jmp_program.o", 300)
+    outputs = await load_and_run(dut, "../example_programs/assembly/jmp_program.o", 300)
     assert outputs[1] == 6
 
-    outputs = await load_and_run(dut, "../example_programs/jmp_program.o", 300, True)
+    outputs = await load_and_run(dut, "../example_programs/assembly/jmp_program.o", 300, True)
     assert outputs[1] == 6
 
 
 @cocotb.test()
 async def test_division_example(dut):
-    outputs = await load_and_run(dut, "../example_programs/division_test.o", 2000)
+    outputs = await load_and_run(dut, "../example_programs/assembly/division_test.o", 2000)
     assert outputs[1] == 4
     assert outputs[2] == 7
 
-    outputs = await load_and_run(dut, "../example_programs/division_test.o", 2000, True)
+    outputs = await load_and_run(dut, "../example_programs/assembly/division_test.o", 2000, True)
     assert outputs[1] == 4
     assert outputs[2] == 7
 
 
 @cocotb.test()
 async def test_division_example_2(dut):
-    outputs = await load_and_run(dut, "../example_programs/div_mult_test.o", 900)
+    outputs = await load_and_run(dut, "../example_programs/assembly/div_mult_test.o", 900)
     assert outputs[1] == 7
     assert outputs[2] == 115
     assert outputs[3] == 1
 
-    outputs = await load_and_run(dut, "../example_programs/div_mult_test.o", 900, True)
+    outputs = await load_and_run(dut, "../example_programs/assembly/div_mult_test.o", 900, True)
     assert outputs[1] == 7
     assert outputs[2] == 115
     assert outputs[3] == 1
@@ -251,14 +251,14 @@ async def test_division_example_2(dut):
 
 @cocotb.test()
 async def test_ram_example(dut):
-    outputs = await load_and_run(dut, "../example_programs/memory_test.o", 300)
+    outputs = await load_and_run(dut, "../example_programs/assembly/memory_test.o", 300)
     assert RAM[21] == 12
     assert RAM[43] == 34
     assert RAM[65] == 56
     assert outputs[1] == 34
     assert outputs[2] == 56
 
-    outputs = await load_and_run(dut, "../example_programs/memory_test.o", 300, True)
+    outputs = await load_and_run(dut, "../example_programs/assembly/memory_test.o", 300, True)
     assert RAM[21] == 12
     assert RAM[43] == 34
     assert RAM[65] == 56
@@ -268,7 +268,7 @@ async def test_ram_example(dut):
 
 @cocotb.test()
 async def test_large_numbers_example(dut):
-    outputs = await load_and_run(dut, "../example_programs/large_numbers.o", 3000)
+    outputs = await load_and_run(dut, "../example_programs/assembly/large_numbers.o", 3000)
     a = 4567 + 1234
     assert outputs[1] == a & 0xFF
     assert outputs[2] == (a >> 8) & 0xFF
@@ -278,7 +278,7 @@ async def test_large_numbers_example(dut):
     assert outputs[4] == (a >> 8) & 0xFF
     assert outputs[5] == (a >> 16) & 0xFF
 
-    outputs = await load_and_run(dut, "../example_programs/large_numbers.o", 3000, True)
+    outputs = await load_and_run(dut, "../example_programs/assembly/large_numbers.o", 3000, True)
     a = 4567 + 1234
     assert outputs[1] == a & 0xFF
     assert outputs[2] == (a >> 8) & 0xFF
@@ -300,12 +300,12 @@ def is_fibonacci(num):
 
 @cocotb.test()
 async def test_fibonacci_example(dut):
-    outputs = await load_and_run(dut, "../example_programs/fibonacci.o", 500)
+    outputs = await load_and_run(dut, "../example_programs/assembly/fibonacci.o", 500)
     assert len(outputs) > 1
     for output in outputs[1:]:
         assert is_fibonacci(output)
 
-    outputs = await load_and_run(dut, "../example_programs/fibonacci.o", 500, True)
+    outputs = await load_and_run(dut, "../example_programs/assembly/fibonacci.o", 500, True)
     assert len(outputs) > 1
     for output in outputs[1:]:
         assert is_fibonacci(output)
@@ -322,12 +322,12 @@ def is_prime(n):
 
 @cocotb.test()
 async def test_primes_example(dut):
-    outputs = await load_and_run(dut, "../example_programs/primes.o", 5000)
+    outputs = await load_and_run(dut, "../example_programs/assembly/primes.o", 5000)
     assert len(outputs) > 2
     for output in outputs[2:]:
         assert is_prime(output.integer)
 
-    outputs = await load_and_run(dut, "../example_programs/primes.o", 5000, True)
+    outputs = await load_and_run(dut, "../example_programs/assembly/primes.o", 5000, True)
     assert len(outputs) > 2
     for output in outputs[2:]:
         assert is_prime(output.integer)
@@ -335,7 +335,7 @@ async def test_primes_example(dut):
 
 # # @cocotb.test()
 # # async def test_all(dut):
-# #     programs = glob.glob('../example_programs/*.e')
+# #     programs = glob.glob('../example_programs/assembly/*.e')
 # #     for program in programs:
 # #         print("Running program: ", program)
 # #         path = Path(program)

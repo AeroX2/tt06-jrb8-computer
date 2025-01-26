@@ -98,14 +98,14 @@ load ram[5] b   //i
 load rom a 1 //arr1
 opp a+b
 save a mar
-save c ram   //arr1[i] = arr2[i]
+save c ram[current]   //arr1[i] = arr2[i]
 
 load ram[5] b   //i
 load rom a 6 //arr2
 opp a+b
 load ram[10] c   //fn
 save a mar  //arr2[i] = ...
-save c ram  //arr2[i] = fn
+save c ram[current]  //arr2[i] = fn
 
 load ram[5] a  //i
 load ram[0] b  //size
@@ -130,8 +130,8 @@ opp a+b
 load ram[a] a  //arr2[i]
 mov a c
 
-load rom b 4
-opp a>>b
+load rom b 16
+opp a*b
 mov a b
 
 cmp a a

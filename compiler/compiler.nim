@@ -8,6 +8,7 @@ import sequtils
 import strformat
 
 import lexer
+import parser
 
 proc parse(inputFile: string, outputFile: string) =
   let inputFileStream = newFileStream(inputFile, fmRead)
@@ -16,9 +17,19 @@ proc parse(inputFile: string, outputFile: string) =
     echo "Input file is empty. Aborting."
     return
 
-  echo lexer.tokenize(inputFileStream)
-  # tokenize()
-  # lexize()
+  try:
+    let tokens = lexer.tokenize(inputFileStream)
+    for token in tokens:
+      if (token.value.isSome):
+        echo token.token,": ",token.value.get()
+      else:
+        echo token.token
+    
+    let ast = parser.parse(tokens)
+    echo ast[]
+  except ValueError as e:
+    echo e.msg
+
   # emitize()
 
 var inputFile: string

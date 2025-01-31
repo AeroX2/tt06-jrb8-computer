@@ -4,48 +4,7 @@ import options
 import strutils
 import strformat
 
-type LexerException* = object of ValueError
-
-type Token = enum
-  # Single-character tokens.
-  LEFT_PAREN
-  RIGHT_PAREN
-  LEFT_BRACE
-  RIGHT_BRACE
-  COMMA
-  DOT
-  MINUS
-  PLUS
-  SEMICOLON
-  SLASH
-  STAR # One or two character tokens.
-  BANG
-  BANG_EQUAL
-  EQUAL
-  EQUAL_EQUAL
-  GREATER
-  GREATER_EQUAL
-  LESS
-  LESS_EQUAL
-  AND
-  AND_AND
-  OR
-  OR_OR # Literals.
-  IDENTIFIER
-  STRING
-  NUMBER # Keywords.
-  VAR
-  IF
-  ELSE
-  TRUE
-  FALSE
-  FOR
-  WHILE
-  FUN
-  RETURN
-  IN
-  OUT
-  EOF
+import tokens
 
 let Keywords = {
   "var": Token.VAR,
@@ -61,9 +20,11 @@ let Keywords = {
   "return": Token.RETURN,
   "in": Token.IN,
   "out": Token.OUT,
+  #
+  "overflow": Token.OVERFLOW,
 }.toTable
 
-type Tokens = seq[(Token, Option[string])]
+type LexerException* = object of ValueError
 
 type Lexer* = ref object
   fs: FileStream
@@ -72,10 +33,10 @@ type Lexer* = ref object
   linePos: int
 
 proc addToken(self: Lexer, token: Token) =
-  self.tokens.add((token, none(string)))
+  self.tokens.add((token, self.line, self.linePos, none(string)))
 
 proc addToken(self: Lexer, token: Token, value: string) =
-  self.tokens.add((token, some(value)))
+  self.tokens.add((token, self.line, self.linePos, some(value)))
 
 proc munch(self: Lexer, c: char): bool =
   if (self.fs.atEnd()):
@@ -86,8 +47,8 @@ proc munch(self: Lexer, c: char): bool =
   discard self.fs.readChar()
   return true
 
-proc stringToken(self: Lexer) =
-  var s = ""
+proc stringToken(self: Lexer, sc: char) =
+  var s = $sc
   var c = self.fs.readChar()
   while (c != '"'):
     if (self.fs.atEnd()):
@@ -103,27 +64,19 @@ proc stringToken(self: Lexer) =
 
   self.addToken(Token.STRING, s)
 
-proc numberToken(self: Lexer) =
-  var s = ""
+proc numberToken(self: Lexer, sc: char) =
+  var s = $sc
   var c = self.fs.readChar()
   while (isDigit(c)):
-    if (self.fs.atEnd()):
-      raise LexerException.newException(
-        fmt"Number was not closed at {self.line}:{self.linePos}"
-      )
-
     s = s & c
     c = self.fs.readChar()
 
   self.addToken(Token.NUMBER, s)
 
-proc asciiToken(self: Lexer) =
-  var s = ""
+proc asciiToken(self: Lexer, sc: char) =
+  var s = $sc
   var c = self.fs.readChar()
   while (isAlphaNumeric(c)):
-    # if (self.fs.atEnd()):
-    #     raise LexerException.newException(fmt"Number was not closed at {self.line}:{self.linePos}")
-
     s = s & c
     c = self.fs.readChar()
 
@@ -178,7 +131,7 @@ proc tokenize*(fs: FileStream): Tokens =
       else:
         lexer.addToken(Token.SLASH)
     of '"':
-      lexer.stringToken()
+      lexer.stringToken(c)
     of ' ':
       discard
     of '\r':
@@ -190,9 +143,9 @@ proc tokenize*(fs: FileStream): Tokens =
       lexer.linePos = 0
     else:
       if isDigit(c):
-        lexer.numberToken()
+        lexer.numberToken(c)
       elif isAlphaAscii(c):
-        lexer.asciiToken()
+        lexer.asciiToken(c)
       else:
         raise LexerException.newException(
           fmt"Invalid token at {lexer.line}:{lexer.linePos}"

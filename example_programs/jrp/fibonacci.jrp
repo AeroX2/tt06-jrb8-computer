@@ -1,0 +1,10 @@
+var a = 0
+var b = 1
+
+out 0
+while (!overflow) {
+    out b
+    var c = b
+    b = a + b
+    a = c 
+}

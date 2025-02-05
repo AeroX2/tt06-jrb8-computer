@@ -4,7 +4,7 @@
 
 This project is an 8-bit computer I originally designed in Logisim Evolution, which I am now porting to TinyTapeout for manufacturing.
 
-More info about the computer can be found in the [Docs](./docs/info.md)
+More info about the computer can be found in the [Docs](./docs/README.md)
 
 # What is Tiny Tapeout?
 

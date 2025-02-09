@@ -1,0 +1,23 @@
+{
+  "name": "jrb8-compiler",
+  "version": "1.0.0",
+  "description": "Compiler for JRB8 Computer",
+  "main": "dist/compiler.js",
+  "scripts": {
+    "test": "jest",
+    "build": "tsc && npm run bundle",
+    "bundle": "esbuild web.ts --bundle --outfile=dist/bundle.js --global-name=jrb8Compiler --platform=browser",
+    "start": "ts-node compiler.ts"
+  },
+  "dependencies": {
+    "typescript": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "esbuild": "^0.19.0",
+    "jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
+    "ts-node": "^10.9.0"
+  }
+}

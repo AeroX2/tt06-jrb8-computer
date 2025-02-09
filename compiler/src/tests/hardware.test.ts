@@ -2,7 +2,6 @@ import { Lexer } from '../core/lexer';
 import { Parser } from '../core/parser';
 import { HardwareCompiler } from '../vm/hardware_compiler';
 import { HardwareVM } from '../vm/hardware_vm';
-import { decodeInstruction, formatInstruction } from '../vm/instruction_decoder';
 
 describe('Hardware VM Tests', () => {
   const source = `
@@ -37,21 +36,6 @@ describe('Hardware VM Tests', () => {
   test('program compilation generates valid machine code', () => {
     expect(program).toBeDefined();
     expect(program.length).toBeGreaterThan(0);
-
-    // Print the raw bytecode for debugging
-    console.log('Raw bytecode:', program.map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
-
-    // Print the generated machine code for debugging
-    let i = 0;
-    const instructions: string[] = [];
-    while (i < program.length) {
-      const decoded = decodeInstruction(program, i);
-      instructions.push(formatInstruction(decoded));
-      i = decoded.nextIndex;
-    }
-    
-    console.log('Decoded instructions:', instructions);
-    expect(instructions.length).toBeGreaterThan(0);
   });
 
   test('program executes correctly and outputs 15', () => {

@@ -12,4 +12,4 @@ load rom a 53
 opp a.*b
 out a
 
-pause
+halt

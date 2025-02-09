@@ -45,7 +45,7 @@ operations = {
     "save": check_save,
     "in": re.compile(r"[abcd]").match,
     "out": re.compile(r"[abcd]|[0-9]+|ram\[[0-9]+\]|ram\[[abcd]\]").match,
-    "pause": lambda x: x == "",
+    "halt": lambda x: x == "",
 }
 
 import csv

@@ -18,7 +18,7 @@ opp a+b
 
 out a
 out c
-pause
+halt
 
 // a = a % b
 // c = a / b

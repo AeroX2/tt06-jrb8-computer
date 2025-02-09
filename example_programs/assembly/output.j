@@ -9,4 +9,4 @@ save a ram[6]
 load rom b 6
 out ram[b]
 
-pause
+halt

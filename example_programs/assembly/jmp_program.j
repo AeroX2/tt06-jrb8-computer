@@ -1,7 +1,7 @@
 jmp start
 :end
 out a
-pause
+halt
 :start
 load rom a 1
 load rom b 1

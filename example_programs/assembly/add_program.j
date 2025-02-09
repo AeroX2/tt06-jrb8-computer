@@ -8,4 +8,4 @@ nop
 
 opp a+b
 out a
-pause
+halt

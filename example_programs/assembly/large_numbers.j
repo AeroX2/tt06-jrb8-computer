@@ -181,5 +181,5 @@ out a
 load ram[0] a
 out a
 
-pause
+halt
 

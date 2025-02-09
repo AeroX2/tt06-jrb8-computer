@@ -14,4 +14,4 @@ load ram[c] c
 
 out b
 out c
-pause
+halt

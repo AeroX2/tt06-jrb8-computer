@@ -11,3 +11,4 @@ build
 tt/
 nppBackup
 node_modules/
+dist/

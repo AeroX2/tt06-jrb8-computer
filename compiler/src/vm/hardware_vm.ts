@@ -63,24 +63,19 @@ export class HardwareVM {
     return [...this.rom];
   }
 
-  private updateFlags(result: number) {
-    if (!this.cmpEnabled) return;
+  private updateFlags(result: number, forceUpdate: boolean = false) {
+    if (!this.cmpEnabled && !forceUpdate) return;
 
+    // Update flags before masking to 8 bits
     this.zeroFlag = (result === 0);
     this.signFlag = ((result & 0x80) !== 0);
-    
-    // Carry flag is set when result exceeds 8 bits
     this.carryFlag = (result > 255 || result < 0);
     
-    // Overflow detection for signed arithmetic
     if (this.signedMode) {
       this.overflowFlag = (result > 127 || result < -128);
     } else {
       this.overflowFlag = false;
     }
-
-    // Ensure result is 8-bit
-    result &= 0xFF;
   }
 
   // Execute one instruction
@@ -126,17 +121,19 @@ export class HardwareVM {
     let value1: number, value2: number;
 
     if (instruction <= CMP_RANGE.MIN + 0x0F) {
-      // Compare with constants
-      value1 = this.getRegisterByIndex(instruction & 0x03);
-      value2 = this.getConstantForCmp(instruction);
+      // Compare with constants (0, 1, -1, 255)
+      const reg = instruction & 0x03;
+      const constType = (instruction >> 2) & 0x03;
+      value1 = this.getRegisterByIndex(reg);
+      value2 = this.getConstantForCmp(constType);
     } else {
-      // Compare registers
+      // Compare between registers
       value1 = this.getRegisterByIndex((instruction >> 2) & 0x03);
       value2 = this.getRegisterByIndex(instruction & 0x03);
     }
 
     const result = value1 - value2;
-    this.updateFlags(result);
+    this.updateFlags(result, true); // Force update flags for compare operations
   }
 
   private executeJump(instruction: number) {
@@ -185,7 +182,7 @@ export class HardwareVM {
       return;
     }
 
-    // Basic operations
+    // Calculate result first
     if (instruction === CU_FLAGS["opp 0"]) result = 0;
     else if (instruction === CU_FLAGS["opp 1"]) result = 1;
     else if (instruction === CU_FLAGS["opp -1"]) result = -1;
@@ -241,40 +238,22 @@ export class HardwareVM {
     else if (instruction === CU_FLAGS["opp d-c"]) result = this.registerD - this.registerC;
     
     // Binary operations - Multiplication (low)
-    else if (instruction === CU_FLAGS["opp a*a"]) result = (this.registerA * this.registerA) & 0xFF;
-    else if (instruction === CU_FLAGS["opp a*b"]) result = (this.registerA * this.registerB) & 0xFF;
-    else if (instruction === CU_FLAGS["opp a*c"]) result = (this.registerA * this.registerC) & 0xFF;
-    else if (instruction === CU_FLAGS["opp a*d"]) result = (this.registerA * this.registerD) & 0xFF;
-    else if (instruction === CU_FLAGS["opp b*a"]) result = (this.registerB * this.registerA) & 0xFF;
-    else if (instruction === CU_FLAGS["opp b*b"]) result = (this.registerB * this.registerB) & 0xFF;
-    else if (instruction === CU_FLAGS["opp b*c"]) result = (this.registerB * this.registerC) & 0xFF;
-    else if (instruction === CU_FLAGS["opp b*d"]) result = (this.registerB * this.registerD) & 0xFF;
-    else if (instruction === CU_FLAGS["opp c*a"]) result = (this.registerC * this.registerA) & 0xFF;
-    else if (instruction === CU_FLAGS["opp c*b"]) result = (this.registerC * this.registerB) & 0xFF;
-    else if (instruction === CU_FLAGS["opp c*c"]) result = (this.registerC * this.registerC) & 0xFF;
-    else if (instruction === CU_FLAGS["opp c*d"]) result = (this.registerC * this.registerD) & 0xFF;
-    else if (instruction === CU_FLAGS["opp d*a"]) result = (this.registerD * this.registerA) & 0xFF;
-    else if (instruction === CU_FLAGS["opp d*b"]) result = (this.registerD * this.registerB) & 0xFF;
-    else if (instruction === CU_FLAGS["opp d*c"]) result = (this.registerD * this.registerC) & 0xFF;
-    else if (instruction === CU_FLAGS["opp d*d"]) result = (this.registerD * this.registerD) & 0xFF;
-    
-    // Binary operations - Multiplication (high)
-    else if (instruction === CU_FLAGS["opp a.*a"]) result = (this.registerA * this.registerA) >> 8;
-    else if (instruction === CU_FLAGS["opp a.*b"]) result = (this.registerA * this.registerB) >> 8;
-    else if (instruction === CU_FLAGS["opp a.*c"]) result = (this.registerA * this.registerC) >> 8;
-    else if (instruction === CU_FLAGS["opp a.*d"]) result = (this.registerA * this.registerD) >> 8;
-    else if (instruction === CU_FLAGS["opp b.*a"]) result = (this.registerB * this.registerA) >> 8;
-    else if (instruction === CU_FLAGS["opp b.*b"]) result = (this.registerB * this.registerB) >> 8;
-    else if (instruction === CU_FLAGS["opp b.*c"]) result = (this.registerB * this.registerC) >> 8;
-    else if (instruction === CU_FLAGS["opp b.*d"]) result = (this.registerB * this.registerD) >> 8;
-    else if (instruction === CU_FLAGS["opp c.*a"]) result = (this.registerC * this.registerA) >> 8;
-    else if (instruction === CU_FLAGS["opp c.*b"]) result = (this.registerC * this.registerB) >> 8;
-    else if (instruction === CU_FLAGS["opp c.*c"]) result = (this.registerC * this.registerC) >> 8;
-    else if (instruction === CU_FLAGS["opp c.*d"]) result = (this.registerC * this.registerD) >> 8;
-    else if (instruction === CU_FLAGS["opp d.*a"]) result = (this.registerD * this.registerA) >> 8;
-    else if (instruction === CU_FLAGS["opp d.*b"]) result = (this.registerD * this.registerB) >> 8;
-    else if (instruction === CU_FLAGS["opp d.*c"]) result = (this.registerD * this.registerC) >> 8;
-    else if (instruction === CU_FLAGS["opp d.*d"]) result = (this.registerD * this.registerD) >> 8;
+    else if (instruction === CU_FLAGS["opp a*a"]) result = this.registerA * this.registerA;
+    else if (instruction === CU_FLAGS["opp a*b"]) result = this.registerA * this.registerB;
+    else if (instruction === CU_FLAGS["opp a*c"]) result = this.registerA * this.registerC;
+    else if (instruction === CU_FLAGS["opp a*d"]) result = this.registerA * this.registerD;
+    else if (instruction === CU_FLAGS["opp b*a"]) result = this.registerB * this.registerA;
+    else if (instruction === CU_FLAGS["opp b*b"]) result = this.registerB * this.registerB;
+    else if (instruction === CU_FLAGS["opp b*c"]) result = this.registerB * this.registerC;
+    else if (instruction === CU_FLAGS["opp b*d"]) result = this.registerB * this.registerD;
+    else if (instruction === CU_FLAGS["opp c*a"]) result = this.registerC * this.registerA;
+    else if (instruction === CU_FLAGS["opp c*b"]) result = this.registerC * this.registerB;
+    else if (instruction === CU_FLAGS["opp c*c"]) result = this.registerC * this.registerC;
+    else if (instruction === CU_FLAGS["opp c*d"]) result = this.registerC * this.registerD;
+    else if (instruction === CU_FLAGS["opp d*a"]) result = this.registerD * this.registerA;
+    else if (instruction === CU_FLAGS["opp d*b"]) result = this.registerD * this.registerB;
+    else if (instruction === CU_FLAGS["opp d*c"]) result = this.registerD * this.registerC;
+    else if (instruction === CU_FLAGS["opp d*d"]) result = this.registerD * this.registerD;
     
     // Binary operations - Division
     else if (instruction === CU_FLAGS["opp a/b"]) result = Math.floor(this.registerA / this.registerB);
@@ -306,8 +285,28 @@ export class HardwareVM {
     else if (instruction === CU_FLAGS["opp b|d"]) result = this.registerB | this.registerD;
     else if (instruction === CU_FLAGS["opp c|d"]) result = this.registerC | this.registerD;
 
-    // Update flags and store result in A register
+    // Binary operations - Special multiplication (high bits)
+    else if (instruction === CU_FLAGS["opp a.*a"]) result = (this.registerA * this.registerA) >> 8;
+    else if (instruction === CU_FLAGS["opp a.*b"]) result = (this.registerA * this.registerB) >> 8;
+    else if (instruction === CU_FLAGS["opp a.*c"]) result = (this.registerA * this.registerC) >> 8;
+    else if (instruction === CU_FLAGS["opp a.*d"]) result = (this.registerA * this.registerD) >> 8;
+    else if (instruction === CU_FLAGS["opp b.*a"]) result = (this.registerB * this.registerA) >> 8;
+    else if (instruction === CU_FLAGS["opp b.*b"]) result = (this.registerB * this.registerB) >> 8;
+    else if (instruction === CU_FLAGS["opp b.*c"]) result = (this.registerB * this.registerC) >> 8;
+    else if (instruction === CU_FLAGS["opp b.*d"]) result = (this.registerB * this.registerD) >> 8;
+    else if (instruction === CU_FLAGS["opp c.*a"]) result = (this.registerC * this.registerA) >> 8;
+    else if (instruction === CU_FLAGS["opp c.*b"]) result = (this.registerC * this.registerB) >> 8;
+    else if (instruction === CU_FLAGS["opp c.*c"]) result = (this.registerC * this.registerC) >> 8;
+    else if (instruction === CU_FLAGS["opp c.*d"]) result = (this.registerC * this.registerD) >> 8;
+    else if (instruction === CU_FLAGS["opp d.*a"]) result = (this.registerD * this.registerA) >> 8;
+    else if (instruction === CU_FLAGS["opp d.*b"]) result = (this.registerD * this.registerB) >> 8;
+    else if (instruction === CU_FLAGS["opp d.*c"]) result = (this.registerD * this.registerC) >> 8;
+    else if (instruction === CU_FLAGS["opp d.*d"]) result = (this.registerD * this.registerD) >> 8;
+
+    // Update flags before masking
     this.updateFlags(result);
+    
+    // Then mask to 8 bits for storage
     this.registerA = result & 0xFF;
   }
 
@@ -372,13 +371,13 @@ export class HardwareVM {
 
   private executeIO(instruction: number) {
     if (instruction >= CU_FLAGS["in a"] && instruction <= CU_FLAGS["in d"]) {
-      // IN instruction
       const targetReg = instruction - CU_FLAGS["in a"];
       const value = this.inputCallback ? this.inputCallback() : 0;
       this.setRegisterValue(targetReg, value);
     } else if (instruction >= CU_FLAGS["out a"] && instruction <= CU_FLAGS["out d"]) {
-      // OUT from register
-      const value = this.getRegisterValue(instruction - CU_FLAGS["out a"]);
+      let value = this.getRegisterValue(instruction - CU_FLAGS["out a"]);
+      // Convert to signed only if in signed mode and top bit is set
+      if (this.signedMode && (value & 0x80)) value = value - 256;
       if (this.outputCallback) {
         this.outputCallback(value);
       }
@@ -445,13 +444,12 @@ export class HardwareVM {
     }
   }
 
-  private getConstantForCmp(instruction: number): number {
-    const type = (instruction >> 2) & 0x03;
+  private getConstantForCmp(type: number): number {
     switch(type) {
-      case 0: return 0;
-      case 1: return 1;
-      case 2: return -1;
-      case 3: return 255;
+      case 0: return 0;   // Compare with 0
+      case 1: return 1;   // Compare with 1
+      case 2: return -1;  // Compare with -1
+      case 3: return 255; // Compare with 255
       default: return 0;
     }
   }

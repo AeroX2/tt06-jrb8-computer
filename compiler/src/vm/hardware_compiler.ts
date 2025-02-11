@@ -7,7 +7,6 @@ import {
   Block, Var, Function, Return, Output
 } from '../ast/statements';
 import { Token } from '../core/tokens';
-import { Register } from './instruction_set';
 import { Assembler } from '../core/assembler';
 
 export class CompileError extends Error {
@@ -32,9 +31,6 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
     for (const stmt of statements) {
       assemblyLines.push(...stmt.accept(this));
     }
-    
-    // Add HALT instruction
-    assemblyLines.push('halt');
     console.log('Generated assembly:', assemblyLines.join('\n'));
 
     // Convert assembly to bytecode

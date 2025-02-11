@@ -1,3 +1,5 @@
+opp cmp on
+opp sign on
 load rom a 53
 load rom b 7
 load rom c 0
@@ -18,6 +20,7 @@ opp a+b
 
 out a
 out c
+
 halt
 
 // a = a % b

@@ -1,3 +1,4 @@
+opp cmp on
 :start
 load rom a 1
 load rom b 0

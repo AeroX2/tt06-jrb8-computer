@@ -1,3 +1,4 @@
+opp sign on
 load rom b 42
 :start
 in a

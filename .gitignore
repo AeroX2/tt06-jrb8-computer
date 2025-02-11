@@ -11,4 +11,4 @@ build
 tt/
 nppBackup
 node_modules/
-dist/
+compiler/dist/*.js

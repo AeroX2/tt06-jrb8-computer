@@ -147,8 +147,7 @@ export class Assembler {
     if (labelMatch) {
       const label = labelMatch[1].trim();
       if (labels.has(label)) {
-        console.error(`Duplicate label detected: ${label}`);
-        return false;
+        throw new AssemblerError(`Duplicate label detected: ${label}`);
       }
       labels.set(label, offset);
       return true;
@@ -156,26 +155,22 @@ export class Assembler {
     return false;
   }
 
-  private translateInstructions(line: string): boolean {
+  private translateInstructions(line: string): void {
     const variables = line.split(' ');
     const opp = variables[0];
     const oppArgs = variables.slice(1).join(' ');
 
     if (opp in this.operations) {
       if (!this.operations[opp](oppArgs)) {
-        console.error(`Invalid operation: ${line}`);
-        return false;
+        throw new AssemblerError(`Invalid operation: ${line}`);
       }
       const hexOp = this.oppToHex(line, this.offset);
       if (hexOp.length === 0) {
-        console.error(`Could not translate instruction: ${line}`);
-        return false;
+        throw new AssemblerError(`Could not translate instruction: ${line}`);
       }
       this.final.push(...hexOp);
-      return true;
     } else {
-      console.error(`Unrecognized instruction: ${line}`);
-      return false;
+      throw new AssemblerError(`Unrecognized instruction: ${line}`);
     }
   }
 
@@ -201,9 +196,7 @@ export class Assembler {
         continue;
       }
 
-      if (!this.translateInstructions(line)) {
-        return [];
-      }
+      this.translateInstructions(line);
     }
 
     return this.final;
@@ -216,8 +209,7 @@ export class Assembler {
       if (ins.kind === HexOrLabelKind.LABEL) {
         const labelHex = this.labels.get(ins.label);
         if (labelHex === undefined) {
-          console.error(`Undefined label: ${ins.label}`);
-          return [];
+          throw new AssemblerError(`Undefined label: ${ins.label}`);
         }
         fileOutput.push(labelHex >> 8);
         fileOutput.push(labelHex & 0xFF);

@@ -18,10 +18,10 @@ describe('Assembler Tests', () => {
 
     const bytecode = assembler.hexOutput(assembler.assemble(assembly));
     expect(bytecode).toEqual([
-      0xc7, 0x05,  // load rom a 5
-      0xc8, 0x03,  // load rom b 3
-      0x67,        // opp a+b
-      0xe7,        // out a
+      0xd0, 0x05,  // load rom a 5
+      0xd1, 0x03,  // load rom b 3
+      0x6c,        // add a b
+      0xf4,        // out a
       0xff         // halt
     ]);
   });
@@ -37,13 +37,12 @@ describe('Assembler Tests', () => {
 
     const bytecode = assembler.hexOutput(assembler.assemble(assembly));
     expect(bytecode).toEqual([
-      0xc7, 0x01,  // load rom a 1
-      0xe7,        // out a
-      0x2d, 0x00, 0x00,  // jmp start (jumps to offset 0)
-      0xff         // halt
+      0xd0, 0x01,        // load rom a 1
+      0xf4,              // out a
+      0x30, 0x00, 0x00,  // jmp start (jumps to offset 0)
+      0xff               // halt
     ]);
   });
-
   test('memory operations', () => {
     const assembly = [
       'load rom a 42',
@@ -55,14 +54,13 @@ describe('Assembler Tests', () => {
 
     const bytecode = assembler.hexOutput(assembler.assemble(assembly));
     expect(bytecode).toEqual([
-      0xc7, 0x2a,  // load rom a 42
-      0xdf, 0x00,  // save a ram[0]
-      0xcc, 0x00,  // load ram[0] b
-      0xe8,        // out b
+      0xd0, 0x2a,  // load rom a 42
+      0xec, 0x00,  // save a ram[0]
+      0xd5, 0x00,  // load ram[0] b
+      0xf5,        // out b
       0xff         // halt
     ]);
   });
-
   test('comparison and conditional jumps', () => {
     const assembly = [
       'load rom a 5',

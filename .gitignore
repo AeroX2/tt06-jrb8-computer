@@ -12,3 +12,4 @@ tt/
 nppBackup
 node_modules/
 compiler/dist/*.js
+compiler/dist/src/**

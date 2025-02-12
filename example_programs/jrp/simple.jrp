@@ -1,0 +1,9 @@
+var count = 5
+var sum = 0
+
+while (count > 0) {
+  sum = sum + count
+  count = count - 1
+}
+
+out sum  // Should output 15 (5 + 4 + 3 + 2 + 1)

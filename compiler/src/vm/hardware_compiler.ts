@@ -21,7 +21,7 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
   private nextVarAddress: number = 0;
   private labelCounter: number = 0;
 
-  compile(statements: Stmt[]): number[] {
+  compileToAssembly(statements: Stmt[]): string[] {
     this.variables.clear();
     this.nextVarAddress = 0;
     this.labelCounter = 0;
@@ -31,12 +31,13 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
     for (const stmt of statements) {
       assemblyLines.push(...stmt.accept(this));
     }
-    console.log('Generated assembly:', assemblyLines.join('\n'));
+    return assemblyLines;
+  }
 
-    // Convert assembly to bytecode
+  compileToBytecode(assembly: string[]): number[] {
     const assembler = new Assembler();
-    const bytecode = assembler.assemble(assemblyLines);
-    
+    const bytecode = assembler.assemble(assembly);
+
     // Convert to final numeric bytecode with resolved labels
     const resolvedBytecode = assembler.hexOutput(bytecode);
     if (resolvedBytecode.length === 0) {

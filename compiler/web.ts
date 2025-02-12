@@ -3,8 +3,8 @@ import { Parser } from './src/core/parser';
 import { HardwareCompiler } from './src/vm/hardware_compiler';
 
 export interface CompilationResult {
+    assembly: string[];
     machineCode: number[];
-    hexCode: string[];
 }
 
 export class CompileError extends Error {
@@ -22,14 +22,12 @@ export async function compile(source: string): Promise<CompilationResult> {
         const parser = new Parser(tokens);
         const ast = parser.parse();
         const compiler = new HardwareCompiler();
-        const machineCode = compiler.compile(ast);
-
-        // Generate hex representation
-        const hexCode = machineCode.map(byte => byte.toString(16).padStart(2, '0'));
+        const assembly = compiler.compileToAssembly(ast);
+        const machineCode = compiler.compileToBytecode(assembly);
 
         return {
+            assembly,
             machineCode,
-            hexCode,
         };
     } catch (error) {
         throw new CompileError(error instanceof Error ? error.message : 'Unknown compilation error');

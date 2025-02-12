@@ -30,7 +30,7 @@
 
         .output-container {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr;
             gap: 20px;
             margin-top: 20px;
         }
@@ -88,25 +88,26 @@
     <div id="dropZone">
         <p>Drag and drop your source file here</p>
         <p>or</p>
-        <input type="file" id="fileInput" accept=".txt,.jrb,.asm">
+        <input type="file" id="fileInput" accept=".txt,.jrp,.asm">
         <button class="button" onclick="document.getElementById('fileInput').click()">Choose File</button>
     </div>
     <div class="output-container">
-        <div class="output-section">
-            <h2>Machine Code</h2>
-            <pre id="machineCode"></pre>
-        </div>
         <div class="output-section">
             <h2>Instructions</h2>
             <pre id="instructions"></pre>
         </div>
     </div>
+    <div class="output-container">
+        <div class="output-section">
+            <h2>Download</h2>
+            <button class="button" onclick="downloadFile()">Download</button>
+        </div>
+    </div>
 
-    <script src="dist/bundle.js"></script>
+    <script src="bundle.js"></script>
     <script>
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
-        const machineCodeOutput = document.getElementById('machineCode');
         const instructionsOutput = document.getElementById('instructions');
 
         // Prevent default drag behaviors
@@ -141,42 +142,52 @@
             dropZone.classList.remove('dragover');
         }
 
+        let file;
         function handleDrop(e) {
             const dt = e.dataTransfer;
-            const file = dt.files[0];
+            file = dt.files[0];
             handleFile(file);
         }
 
         function handleFileSelect(e) {
-            const file = e.target.files[0];
+            file = e.target.files[0];
             handleFile(file);
         }
 
+        let result;
         function handleFile(file) {
             const reader = new FileReader();
             reader.onload = async (e) => {
                 try {
-                    const source = e.target.result;
-                    const result = await window.jrb8Compiler.compile(source);
+                    source = e.target.result;
+                    result = await window.jrb8Compiler.compile(source);
                     
                     // Display machine code
-                    machineCodeOutput.textContent = result.hexCode.join(' ');
+                    instructionsOutput.textContent = result.assembly.join('\n');
 
                     // Remove any previous error styling
-                    machineCodeOutput.parentElement.classList.remove('error');
                     instructionsOutput.parentElement.classList.remove('error');
                 } catch (error) {
                     // Display error in both sections
                     const errorMessage = `Compilation error: ${error.message}`;
-                    machineCodeOutput.textContent = errorMessage;
                     instructionsOutput.textContent = errorMessage;
                     
                     // Add error styling
-                    machineCodeOutput.parentElement.classList.add('error');
                     instructionsOutput.parentElement.classList.add('error');
                 }
             };
             reader.readAsText(file);
+        }
+
+        function downloadFile() {
+            const machineCode = result.machineCode;
+            const buffer = new Uint8Array(machineCode);
+            const blob = new Blob([buffer], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = file.name.split('.').slice(0, -1) + '.bin';
+            a.click();
         }
     </script>
 </body>

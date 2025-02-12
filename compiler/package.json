@@ -8,9 +8,11 @@
     "build": "tsc && npm run bundle",
     "bundle": "esbuild web.ts --bundle --outfile=dist/bundle.js --global-name=jrb8Compiler --platform=browser",
     "start": "ts-node compiler.ts",
-    "convert": "node scripts/convert_csv_to_ts.js"
+    "convert": "node scripts/convert_csv_to_ts.js",
+    "dev": "npm run build && http-server ./dist -o -c-1"
   },
   "dependencies": {
+    "http-server": "^14.1.1",
     "typescript": "^5.0.0"
   },
   "devDependencies": {

@@ -36,7 +36,8 @@ try {
     const parser = new Parser(tokens);
     const ast = parser.parse();
     const compiler = new HardwareCompiler();
-    const machineCode = compiler.compile(ast);
+    const assembly = compiler.compileToAssembly(ast);
+    const machineCode = compiler.compileToBytecode(assembly);
 
     // Write to file
     if (outputFile === '-') {

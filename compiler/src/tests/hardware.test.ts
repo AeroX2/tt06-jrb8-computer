@@ -26,7 +26,8 @@ describe('Hardware VM Tests', () => {
     const parser = new Parser(tokens);
     const ast = parser.parse();
     const compiler = new HardwareCompiler();
-    program = compiler.compile(ast);
+    const assembly = compiler.compileToAssembly(ast);
+    program = compiler.compileToBytecode(assembly);
 
     // Initialize VM
     vm = new HardwareVM();

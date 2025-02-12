@@ -1,0 +1,207 @@
+import { CU_FLAGS } from '../utils/cu_flags';
+export var HexOrLabelKind;
+(function (HexOrLabelKind) {
+    HexOrLabelKind[HexOrLabelKind["HEX"] = 0] = "HEX";
+    HexOrLabelKind[HexOrLabelKind["LABEL"] = 1] = "LABEL";
+})(HexOrLabelKind || (HexOrLabelKind = {}));
+export class AssemblerError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = 'AssemblerError';
+    }
+}
+// Regex patterns as constants
+const REGISTER = /[abcd]/;
+const REGISTER_PAIR = /([abcd]) ([abcd])/;
+const NUMBER = /((0x[0-9a-fA-F]+)|(0b[01]+)|(0o[0-9]+)|([0-9]+))/;
+const RAM_REGISTER = /ram\[[abcd]\] [abcd]/;
+const RAM_NUMBER = /ram\[[0-9]+\] [abcd]/;
+const ROM_LOAD = /rom [abcd] [0-9]+/;
+const RAM_SAVE = /[abcd] ram/;
+const RAM_REGISTER_SAVE = /[abcd] ram\[[abcd]\]/;
+const RAM_NUMBER_SAVE = /[abcd] ram\[[0-9]+\]/;
+const MAR_SAVE = /[abcd] mar/;
+const COMPARE = /([abcd]) ([abcd]|0|1|-1|255)/;
+const JUMP = /(\.?(<=|<|=|>|>=) [abcd])|(.+)/;
+const OUT_PATTERN = /[abcd]|[0-9]+|ram\[[0-9]+\]|ram\[[abcd]\]/;
+export class Assembler {
+    final = [];
+    labels = new Map();
+    offset = { value: 0 };
+    // Helper functions for instruction checking
+    checkMov(args) {
+        const r = args.match(REGISTER_PAIR);
+        return r !== null && r[1] !== r[2];
+    }
+    checkLoad(args) {
+        if (args.match(RAM_REGISTER))
+            return true;
+        if (args.match(RAM_NUMBER))
+            return true;
+        return args.match(ROM_LOAD) !== null;
+    }
+    checkSave(args) {
+        if (args.match(RAM_SAVE))
+            return true;
+        if (args.match(RAM_REGISTER_SAVE))
+            return true;
+        if (args.match(RAM_NUMBER_SAVE))
+            return true;
+        return args.match(MAR_SAVE) !== null;
+    }
+    // Define operations map with proper type
+    operations = {
+        "nop": (x) => x === "",
+        "mov": (x) => this.checkMov(x),
+        "cmp": (x) => x.match(COMPARE) !== null,
+        "jmp": (x) => x.match(JUMP) !== null,
+        "jmpr": (x) => x.match(JUMP) !== null,
+        "opp": (x) => true,
+        "load": (x) => this.checkLoad(x),
+        "save": (x) => this.checkSave(x),
+        "in": (x) => x.match(REGISTER) !== null,
+        "out": (x) => x.match(OUT_PATTERN) !== null,
+        "halt": (x) => x === "",
+    };
+    // Get translation stage two instructions (those with {label} or {number})
+    translationKeys = Object.keys(CU_FLAGS);
+    translationStageTwo = this.translationKeys.filter(key => key.includes('{label}') || key.includes('{number}'));
+    matchLabelInstruction(line, instruction) {
+        const escapedInstruction = this.escapeRegExp(instruction);
+        const matchWholeIns = `^${escapedInstruction.replace(/\\{label\\}/, "([^ ]+)")}$`;
+        const match = line.match(new RegExp(matchWholeIns));
+        if (match) {
+            return [
+                { kind: HexOrLabelKind.HEX, hex: CU_FLAGS[instruction] },
+                { kind: HexOrLabelKind.LABEL, label: match[1] },
+            ];
+        }
+        return null;
+    }
+    matchNumberInstruction(line, instruction) {
+        const escapedInstruction = this.escapeRegExp(instruction);
+        const matchWholeIns = `^${escapedInstruction.replace(/\\{number\\}/, NUMBER.source)}$`;
+        const match = line.match(new RegExp(matchWholeIns));
+        if (match) {
+            let num;
+            if (match[2]) { // hex
+                num = parseInt(match[2], 16);
+            }
+            else if (match[3]) { // binary
+                num = parseInt(match[3].substring(2), 2);
+            }
+            else if (match[4]) { // octal
+                num = parseInt(match[4].substring(2), 8);
+            }
+            else { // decimal
+                num = parseInt(match[5]);
+            }
+            if (!this.validateHex(num)) {
+                throw new AssemblerError("Number larger than can fit in register");
+            }
+            return [
+                { kind: HexOrLabelKind.HEX, hex: CU_FLAGS[instruction] },
+                { kind: HexOrLabelKind.HEX, hex: num },
+            ];
+        }
+        return null;
+    }
+    oppToHex(line, offset) {
+        if (line in CU_FLAGS) {
+            offset.value++;
+            return [{ kind: HexOrLabelKind.HEX, hex: CU_FLAGS[line] }];
+        }
+        for (const instruction of this.translationStageTwo) {
+            let result;
+            if (instruction.includes('{label}')) {
+                result = this.matchLabelInstruction(line, instruction);
+            }
+            else {
+                result = this.matchNumberInstruction(line, instruction);
+            }
+            if (result) {
+                offset.value += instruction.includes('{label}') ? 3 : 2;
+                return result;
+            }
+        }
+        return [];
+    }
+    handleLabels(line, labels, offset) {
+        const labelMatch = line.match(/:(.+)/);
+        if (labelMatch) {
+            const label = labelMatch[1].trim();
+            if (labels.has(label)) {
+                throw new AssemblerError(`Duplicate label detected: ${label}`);
+            }
+            labels.set(label, offset);
+            return true;
+        }
+        return false;
+    }
+    translateInstructions(line) {
+        const variables = line.split(' ');
+        const opp = variables[0];
+        const oppArgs = variables.slice(1).join(' ');
+        if (opp in this.operations) {
+            if (!this.operations[opp](oppArgs)) {
+                throw new AssemblerError(`Invalid operation: ${line}`);
+            }
+            const hexOp = this.oppToHex(line, this.offset);
+            if (hexOp.length === 0) {
+                throw new AssemblerError(`Could not translate instruction: ${line}`);
+            }
+            this.final.push(...hexOp);
+        }
+        else {
+            throw new AssemblerError(`Unrecognized instruction: ${line}`);
+        }
+    }
+    /**
+     * Assembles a list of assembly instructions into machine code
+     * @param lines Array of assembly instruction strings
+     * @returns Array of hex values and labels
+     * @throws AssemblerError if assembly fails
+     */
+    assemble(lines) {
+        if (!Array.isArray(lines)) {
+            throw new AssemblerError('Input must be an array of strings');
+        }
+        this.final = [];
+        this.labels.clear();
+        this.offset.value = 0;
+        for (let line of lines) {
+            line = line.replace(/\/\/.*/, '').trim();
+            if (line.length === 0)
+                continue;
+            if (this.handleLabels(line, this.labels, this.offset.value)) {
+                continue;
+            }
+            this.translateInstructions(line);
+        }
+        return this.final;
+    }
+    hexOutput(final) {
+        const fileOutput = [];
+        for (const ins of final) {
+            if (ins.kind === HexOrLabelKind.LABEL) {
+                const labelHex = this.labels.get(ins.label);
+                if (labelHex === undefined) {
+                    throw new AssemblerError(`Undefined label: ${ins.label}`);
+                }
+                fileOutput.push(labelHex >> 8);
+                fileOutput.push(labelHex & 0xFF);
+            }
+            else {
+                fileOutput.push(ins.hex);
+            }
+        }
+        return fileOutput;
+    }
+    validateHex(hex) {
+        return Number.isInteger(hex) && hex >= 0 && hex <= 0xff;
+    }
+    escapeRegExp(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+    }
+}
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiYXNzZW1ibGVyLmpzIiwic291cmNlUm9vdCI6IiIsInNvdXJjZXMiOlsiLi4vLi4vLi4vc3JjL2NvcmUvYXNzZW1ibGVyLnRzIl0sIm5hbWVzIjpbXSwibWFwcGluZ3MiOiJBQUFBLE9BQU8sRUFBRSxRQUFRLEVBQUUsTUFBTSxtQkFBbUIsQ0FBQztBQUU3QyxNQUFNLENBQU4sSUFBWSxjQUdYO0FBSEQsV0FBWSxjQUFjO0lBQ3hCLGlEQUFHLENBQUE7SUFDSCxxREFBSyxDQUFBO0FBQ1AsQ0FBQyxFQUhXLGNBQWMsS0FBZCxjQUFjLFFBR3pCO0FBTUQsTUFBTSxPQUFPLGNBQWUsU0FBUSxLQUFLO0lBQ3ZDLFlBQVksT0FBZTtRQUN6QixLQUFLLENBQUMsT0FBTyxDQUFDLENBQUM7UUFDZixJQUFJLENBQUMsSUFBSSxHQUFHLGdCQUFnQixDQUFDO0lBQy9CLENBQUM7Q0FDRjtBQUVELDhCQUE4QjtBQUM5QixNQUFNLFFBQVEsR0FBRyxRQUFRLENBQUM7QUFDMUIsTUFBTSxhQUFhLEdBQUcsbUJBQW1CLENBQUM7QUFDMUMsTUFBTSxNQUFNLEdBQUcsa0RBQWtELENBQUM7QUFDbEUsTUFBTSxZQUFZLEdBQUcsc0JBQXNCLENBQUM7QUFDNUMsTUFBTSxVQUFVLEdBQUcsc0JBQXNCLENBQUM7QUFDMUMsTUFBTSxRQUFRLEdBQUcsbUJBQW1CLENBQUM7QUFDckMsTUFBTSxRQUFRLEdBQUcsWUFBWSxDQUFDO0FBQzlCLE1BQU0saUJBQWlCLEdBQUcsc0JBQXNCLENBQUM7QUFDakQsTUFBTSxlQUFlLEdBQUcsc0JBQXNCLENBQUM7QUFDL0MsTUFBTSxRQUFRLEdBQUcsWUFBWSxDQUFDO0FBQzlCLE1BQU0sT0FBTyxHQUFHLDhCQUE4QixDQUFDO0FBQy9DLE1BQU0sSUFBSSxHQUFHLGdDQUFnQyxDQUFDO0FBQzlDLE1BQU0sV0FBVyxHQUFHLDJDQUEyQyxDQUFDO0FBRWhFLE1BQU0sT0FBTyxTQUFTO0lBQ1osS0FBSyxHQUFpQixFQUFFLENBQUM7SUFDekIsTUFBTSxHQUFH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

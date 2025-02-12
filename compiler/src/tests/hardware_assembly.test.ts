@@ -104,8 +104,8 @@ describe('Assembly Program Validation', () => {
     // Verify outputs
     if (expectedState.maxSteps < 0) {
       // For infinite programs, check if output starts with the expected sequence
-      const expectedStr = expectedState.outputs.join(',');
-      const actualStr = actualOutputs.slice(0, expectedState.outputs.length).join(',');
+      const expectedStr = expectedState.outputs;
+      const actualStr = actualOutputs.slice(0, expectedState.outputs.length);
       expect(actualStr).toEqual(expectedStr);
     } else {
       // For finite programs, check exact match

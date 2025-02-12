@@ -1,5 +1,3 @@
-opp cmp on
-opp sign on
 load rom a 53
 load rom b 7
 load rom c 0

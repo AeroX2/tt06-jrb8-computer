@@ -63,10 +63,7 @@ export class HardwareVM {
     return [...this.rom];
   }
 
-  private updateFlags(result: number, forceUpdate: boolean = false) {
-    if (!this.cmpEnabled && !forceUpdate) return;
-
-    // Update flags before masking to 8 bits
+  private updateFlags(result: number) {
     this.zeroFlag = (result === 0);
     this.signFlag = ((result & 0x80) !== 0);
     this.carryFlag = (result > 255 || result < 0);
@@ -111,10 +108,19 @@ export class HardwareVM {
   }
 
   private executeMove(instruction: number) {
-    const src = (instruction >> 2) & 0x03;
-    const dst = instruction & 0x03;
-    const value = this.getRegisterByIndex(src);
-    this.setRegisterByIndex(dst, value);
+    // Get source and destination from instruction mapping
+    // For instruction 0xXY:
+    // if Y < 4: src = 0 (A), dst = Y
+    // if Y < 7: src = 1 (B), dst = Y-3
+    // if Y < A: src = 2 (C), dst = Y-6
+    // if Y < D: src = 3 (D), dst = Y-9
+    const instr = instruction & 0x0F;
+    if (instr === 0 || instr > 0x0C) return; // NOP or invalid
+    
+    const src = Math.floor((instr - 1) / 3);
+    const dst = ((instr - 1) % 3) + (((instr - 1) % 3) >= src ? 1 : 0);
+    
+    this.setRegisterByIndex(dst, this.getRegisterByIndex(src));
   }
 
   private executeCompare(instruction: number) {
@@ -133,7 +139,7 @@ export class HardwareVM {
     }
 
     const result = value1 - value2;
-    this.updateFlags(result, true); // Force update flags for compare operations
+    this.updateFlags(result);
   }
 
   private executeJump(instruction: number) {
@@ -209,19 +215,22 @@ export class HardwareVM {
     else if (instruction === CU_FLAGS["opp c-1"]) result = this.registerC - 1;
     else if (instruction === CU_FLAGS["opp d-1"]) result = this.registerD - 1;
     
-    // Binary operations - Addition
-    else if (instruction === CU_FLAGS["opp a+b"]) result = this.registerA + this.registerB;
-    else if (instruction === CU_FLAGS["opp a+c"]) result = this.registerA + this.registerC;
-    else if (instruction === CU_FLAGS["opp a+d"]) result = this.registerA + this.registerD;
-    else if (instruction === CU_FLAGS["opp b+a"]) result = this.registerB + this.registerA;
-    else if (instruction === CU_FLAGS["opp b+c"]) result = this.registerB + this.registerC;
-    else if (instruction === CU_FLAGS["opp b+d"]) result = this.registerB + this.registerD;
-    else if (instruction === CU_FLAGS["opp c+a"]) result = this.registerC + this.registerA;
-    else if (instruction === CU_FLAGS["opp c+b"]) result = this.registerC + this.registerB;
-    else if (instruction === CU_FLAGS["opp c+d"]) result = this.registerC + this.registerD;
-    else if (instruction === CU_FLAGS["opp d+a"]) result = this.registerD + this.registerA;
-    else if (instruction === CU_FLAGS["opp d+b"]) result = this.registerD + this.registerB;
-    else if (instruction === CU_FLAGS["opp d+c"]) result = this.registerD + this.registerC;
+    // Binary operations - Addition (now with carry handling)
+    else if (instruction >= CU_FLAGS["opp a+b"] && instruction <= CU_FLAGS["opp d+c"]) {
+      const carryValue = (this.cmpEnabled && this.carryFlag) ? 1 : 0;
+      if (instruction === CU_FLAGS["opp a+b"]) result = this.registerA + this.registerB + carryValue;
+      else if (instruction === CU_FLAGS["opp a+c"]) result = this.registerA + this.registerC + carryValue;
+      else if (instruction === CU_FLAGS["opp a+d"]) result = this.registerA + this.registerD + carryValue;
+      else if (instruction === CU_FLAGS["opp b+a"]) result = this.registerB + this.registerA + carryValue;
+      else if (instruction === CU_FLAGS["opp b+c"]) result = this.registerB + this.registerC + carryValue;
+      else if (instruction === CU_FLAGS["opp b+d"]) result = this.registerB + this.registerD + carryValue;
+      else if (instruction === CU_FLAGS["opp c+a"]) result = this.registerC + this.registerA + carryValue;
+      else if (instruction === CU_FLAGS["opp c+b"]) result = this.registerC + this.registerB + carryValue;
+      else if (instruction === CU_FLAGS["opp c+d"]) result = this.registerC + this.registerD + carryValue;
+      else if (instruction === CU_FLAGS["opp d+a"]) result = this.registerD + this.registerA + carryValue;
+      else if (instruction === CU_FLAGS["opp d+b"]) result = this.registerD + this.registerB + carryValue;
+      else if (instruction === CU_FLAGS["opp d+c"]) result = this.registerD + this.registerC + carryValue;
+    }
     
     // Binary operations - Subtraction
     else if (instruction === CU_FLAGS["opp a-b"]) result = this.registerA - this.registerB;
@@ -303,11 +312,34 @@ export class HardwareVM {
     else if (instruction === CU_FLAGS["opp d.*c"]) result = (this.registerD * this.registerC) >> 8;
     else if (instruction === CU_FLAGS["opp d.*d"]) result = (this.registerD * this.registerD) >> 8;
 
-    // Update flags before masking
+    // Update flags 
     this.updateFlags(result);
     
+    // Determine destination register based on operation type
+    // For operations like "a+b", result goes to A
+    // For operations like "b+a", result goes to B
+    // For operations like "c+d", result goes to C
+    // For operations like "d+c", result goes to D
+    const destReg = this.getALUDestinationRegister(instruction);
+    
     // Then mask to 8 bits for storage
-    this.registerA = result & 0xFF;
+    this.setRegisterByIndex(destReg, result & 0xFF);
+  }
+
+  private getALUDestinationRegister(instruction: number): number {
+    // Extract the first operand from the operation name
+    // For example: "a+b" -> a, "b-c" -> b, etc.
+    const opStr = Object.entries(CU_FLAGS).find(([_, value]) => value === instruction)?.[0] || "";
+    if (!opStr.startsWith("opp ")) return 0;  // Default to A if not found
+    
+    const firstOperand = opStr.charAt(4);  // Get first character after "opp "
+    switch (firstOperand) {
+      case 'a': return 0;  // A register
+      case 'b': return 1;  // B register
+      case 'c': return 2;  // C register
+      case 'd': return 3;  // D register
+      default: return 0;   // Default to A register
+    }
   }
 
   private executeLoad(instruction: number) {
@@ -408,14 +440,14 @@ export class HardwareVM {
       case 0x0: return true;  // Unconditional
       case 0x1: return this.zeroFlag;  // Equal
       case 0x2: return !this.zeroFlag; // Not Equal
-      case 0x3: return !this.carryFlag && !this.zeroFlag; // Less Than (unsigned)
-      case 0x4: return !this.carryFlag || this.zeroFlag; // Less Equal (unsigned)
-      case 0x5: return this.carryFlag && !this.zeroFlag; // Greater Than (unsigned)
-      case 0x6: return this.carryFlag || this.zeroFlag; // Greater Equal (unsigned)
-      case 0x7: return (this.signFlag !== this.overflowFlag) && !this.zeroFlag; // Less Than (signed)
+      case 0x3: return this.carryFlag; // Less Than (unsigned)
+      case 0x4: return this.carryFlag || this.zeroFlag; // Less Equal (unsigned)
+      case 0x5: return !this.carryFlag && !this.zeroFlag; // Greater Than (unsigned)
+      case 0x6: return !this.carryFlag; // Greater Equal (unsigned)
+      case 0x7: return (this.signFlag !== this.overflowFlag); // Less Than (signed)
       case 0x8: return (this.signFlag !== this.overflowFlag) || this.zeroFlag; // Less Equal (signed)
       case 0x9: return (this.signFlag === this.overflowFlag) && !this.zeroFlag; // Greater Than (signed)
-      case 0xA: return (this.signFlag === this.overflowFlag) || this.zeroFlag; // Greater Equal (signed)
+      case 0xA: return (this.signFlag === this.overflowFlag); // Greater Equal (signed)
       case 0xB: return this.zeroFlag; // Zero flag set
       case 0xC: return this.overflowFlag; // Overflow flag set
       case 0xD: return this.carryFlag; // Carry flag set
@@ -470,21 +502,13 @@ export class HardwareVM {
     this.inputCallback = callback;
   }
 
-  getRam(): number[] {
-    const result = new Array(256);
-    for (let i = 0; i < this.ram.length; i++) {
-      if (this.ram[i] !== 0) {
-        result[i] = this.ram[i];
-      }
-    }
-    return result;
-  }
 
   // Debug methods
   getRegisterA(): number { return this.registerA; }
   getRegisterB(): number { return this.registerB; }
   getRegisterC(): number { return this.registerC; }
   getRegisterD(): number { return this.registerD; }
+  getRam(): number[] { return this.ram; }
   getProgramCounter(): number { return this.pc; }
   getCurrentInstruction(): number { return this.rom[this.pc]; }
   getFlags(): { z: boolean, o: boolean, c: boolean, s: boolean } {

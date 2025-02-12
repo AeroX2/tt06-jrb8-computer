@@ -18,7 +18,7 @@ export class HardwareVM {
   private overflowFlag: boolean = false;
   private carryFlag: boolean = false;
   private signFlag: boolean = false;
-  private cmpEnabled: boolean = false;
+  private carryEnabled: boolean = false;
   private signedMode: boolean = false;
 
   // Program Counter
@@ -48,7 +48,7 @@ export class HardwareVM {
     this.overflowFlag = false;
     this.carryFlag = false;
     this.signFlag = false;
-    this.cmpEnabled = false;
+    this.carryEnabled = false;
     this.signedMode = false;
   }
 
@@ -174,11 +174,11 @@ export class HardwareVM {
     if (instruction === CU_FLAGS["opp clr"]) {
       this.resetFlags();
       return;
-    } else if (instruction === CU_FLAGS["opp cmp off"]) {
-      this.cmpEnabled = false;
+    } else if (instruction === CU_FLAGS["opp carry off"]) {
+      this.carryEnabled = false;
       return;
-    } else if (instruction === CU_FLAGS["opp cmp on"]) {
-      this.cmpEnabled = true;
+    } else if (instruction === CU_FLAGS["opp carry on"]) {
+      this.carryEnabled = true;
       return;
     } else if (instruction === CU_FLAGS["opp sign off"]) {
       this.signedMode = false;
@@ -217,7 +217,7 @@ export class HardwareVM {
     
     // Binary operations - Addition (now with carry handling)
     else if (instruction >= CU_FLAGS["opp a+b"] && instruction <= CU_FLAGS["opp d+c"]) {
-      const carryValue = (this.cmpEnabled && this.carryFlag) ? 1 : 0;
+      const carryValue = (this.carryEnabled && this.carryFlag) ? 1 : 0;
       if (instruction === CU_FLAGS["opp a+b"]) result = this.registerA + this.registerB + carryValue;
       else if (instruction === CU_FLAGS["opp a+c"]) result = this.registerA + this.registerC + carryValue;
       else if (instruction === CU_FLAGS["opp a+d"]) result = this.registerA + this.registerD + carryValue;

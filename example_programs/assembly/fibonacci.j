@@ -1,4 +1,4 @@
-opp cmp on
+opp carry on
 :start
 load rom a 1
 load rom b 0

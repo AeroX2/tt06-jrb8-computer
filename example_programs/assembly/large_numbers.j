@@ -1,4 +1,4 @@
-opp cmp on
+opp carry on
 
 // Large addition
 // = 1234 + 4567

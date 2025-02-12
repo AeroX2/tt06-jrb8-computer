@@ -20,8 +20,8 @@ module alu (
     output cmpo
 );
   localparam CLR_CMP_INS = 'h50;
-  localparam CMP_OFF_INS = 'h51;
-  localparam CMP_ON_INS = 'h52;
+  localparam CARRY_OFF_INS = 'h51;
+  localparam CARRY_ON_INS = 'h52;
   localparam SIGN_OFF_INS = 'h53;
   localparam SIGN_ON_INS = 'h54;
 
@@ -54,7 +54,7 @@ module alu (
 
   logic [15:0] mult;
 
-  wire carried = cmp_mode && carryin;
+  wire carried = carry_mode && carryin;
 
   typedef enum {
     IDLE,
@@ -69,13 +69,13 @@ module alu (
   } State;
 
   State state, next_state;
-  logic cmp_mode, signed_mode;
+  logic carry_mode, signed_mode;
   always_ff @(posedge clk, posedge rst) begin
     if (rst) begin
       state <= IDLE;
 
       done_reg <= 1;
-      cmp_mode <= 0;
+      carry_mode <= 0;
       signed_mode <= 0;
 
       val <= 0;
@@ -91,12 +91,12 @@ module alu (
       state <= next_state;
       case (state)
         IDLE: begin
-          if (cins == CMP_OFF_INS) begin
+          if (cins == CARRY_OFF_INS) begin
             done_reg <= ~done_reg;
-            cmp_mode <= 0;
-          end else if (cins == CMP_ON_INS) begin
+            carry_mode <= 0;
+          end else if (cins == CARRY_ON_INS) begin
             done_reg <= ~done_reg;
-            cmp_mode <= 1;
+            carry_mode <= 1;
           end else if (cins == SIGN_OFF_INS) begin
             done_reg <= ~done_reg;
             signed_mode <= 0;
@@ -147,7 +147,7 @@ module alu (
 
     // TODO: Is there a way to avoid calculating this on every clock cycle?
     mult = signed_mode ? $signed(xora) * $signed(xorb) : xora * xorb;
-    full_sum = xora + xorb + {8'b0, po} + {8'b0, (cmp_mode && cmp) ? carried : 1'b0};
+    full_sum = xora + xorb + {8'b0, po} + {8'b0, (carry_mode && cmp) ? carried : 1'b0};
 
     case (state)
       IDLE: begin

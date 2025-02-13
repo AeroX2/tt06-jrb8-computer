@@ -31,6 +31,7 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
     for (const stmt of statements) {
       assemblyLines.push(...stmt.accept(this));
     }
+    assemblyLines.push('halt');
     return assemblyLines;
   }
 
@@ -85,7 +86,7 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
         case Token.LESS:
         case Token.LESS_EQUAL:
         case Token.EQUAL_EQUAL:
-          result.push('cmp a b');
+          result.push('opp a-b');
           break;
       }
     }

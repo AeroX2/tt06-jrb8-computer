@@ -1,0 +1,19 @@
+// Tests complex conditional logic
+var x = 10
+var result = 0
+
+if (x > 5) {
+    if (x < 15) {
+        result = 1
+    } else {
+        result = 2
+    }
+} else {
+    if (x < 3) {
+        result = 3
+    } else {
+        result = 4
+    }
+}
+
+out result  // Should output 1 

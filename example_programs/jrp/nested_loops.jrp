@@ -1,0 +1,12 @@
+// Tests nested loop structures with both while and for
+var sum = 0
+
+for (var i = 3; i > 0; i = i - 1) {
+    var j = i
+    while (j > 0) {
+        sum = sum + 1
+        j = j - 1
+    }
+}
+
+out sum  // Should still output 6 (3 + 2 + 1) 

@@ -1,0 +1,9 @@
+// Tests all comparison operators
+var x = 5
+var y = 3
+
+out x > y   // 1
+out x < y   // 0
+out x == y  // 0
+out x >= y  // 1
+out x <= y  // 0 

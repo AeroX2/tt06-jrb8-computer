@@ -21,6 +21,16 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
   private nextVarAddress: number = 0;
   private labelCounter: number = 0;
 
+  // Group related operators into constants for better maintainability
+  private static readonly COMPARISON_OPERATORS = new Set([
+    Token.GREATER, Token.GREATER_EQUAL, Token.LESS,
+    Token.LESS_EQUAL, Token.EQUAL_EQUAL
+  ]);
+
+  private static readonly RIGHT_EVAL_FIRST_OPERATORS = new Set([
+    Token.MINUS, Token.SLASH
+  ]);
+
   compileToAssembly(statements: Stmt[]): string[] {
     this.variables.clear();
     this.nextVarAddress = 0;
@@ -57,40 +67,75 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
   }
 
   visitBinary(expr: Binary): string[] {
-    const result: string[] = [];
-    
-    // For subtraction, evaluate right operand first
-    if (expr.op === Token.MINUS) {
-      result.push(...expr.right.accept(this));
-      result.push('mov a b');
-      result.push(...expr.left.accept(this));
-      result.push('opp a-b');
+    if (HardwareCompiler.COMPARISON_OPERATORS.has(expr.op)) {
+      return this.handleComparison(expr);
+    } else if (HardwareCompiler.RIGHT_EVAL_FIRST_OPERATORS.has(expr.op)) {
+      return this.handleRightFirst(expr);
     } else {
-      // For other operations, evaluate left operand first
-      result.push(...expr.left.accept(this));
-      result.push('mov a b');
-      result.push(...expr.right.accept(this));
-      
-      switch (expr.op) {
-        case Token.PLUS:
-          result.push('opp a+b');
-          break;
-        case Token.STAR:
-          result.push('opp a*b');
-          break;
-        case Token.SLASH:
-          result.push('opp a/b');
-          break;
-        case Token.GREATER:
-        case Token.GREATER_EQUAL:
-        case Token.LESS:
-        case Token.LESS_EQUAL:
-        case Token.EQUAL_EQUAL:
-          result.push('opp a-b');
-          break;
-      }
+      return this.handleLeftFirst(expr);
+    }
+  }
+
+  private handleComparison(expr: Binary): string[] {
+    const result: string[] = [];
+    result.push(
+      ...expr.left.accept(this),
+      'mov a b',
+      ...expr.right.accept(this),
+      'cmp b a'
+    );
+    
+    const skipLabel = this.createLabel();
+    result.push('load rom a 0');
+    
+    const jumpMap: Partial<Record<Token, string>> = {
+      [Token.GREATER]: '<=',
+      [Token.GREATER_EQUAL]: '<',
+      [Token.LESS]: '>=',
+      [Token.LESS_EQUAL]: '>',
+      [Token.EQUAL_EQUAL]: '!='
+    };
+    
+    result.push(`jmp ${jumpMap[expr.op]} ${skipLabel}`);
+    result.push('load rom a 1', `:${skipLabel}`);
+    return result;
+  }
+
+  private handleRightFirst(expr: Binary): string[] {
+    const result: string[] = [];
+    result.push(
+      ...expr.right.accept(this),
+      'mov a b',
+      ...expr.left.accept(this)
+    );
+    
+    const opMap: Partial<Record<Token, string>> = {
+      [Token.MINUS]: 'a-b',
+      [Token.SLASH]: 'a/b'
+    };
+    
+    result.push(`opp ${opMap[expr.op]}`);
+    return result;
+  }
+
+  private handleLeftFirst(expr: Binary): string[] {
+    const result: string[] = [];
+    result.push(
+      ...expr.left.accept(this),
+      'mov a b',
+      ...expr.right.accept(this)
+    );
+    
+    const opMap: Partial<Record<Token, string>> = {
+      [Token.PLUS]: 'a+b',
+      [Token.STAR]: 'a*b'
+    };
+    
+    if (!opMap[expr.op]) {
+      throw new CompileError(`Unknown binary operator: ${expr.op}`);
     }
     
+    result.push(`opp ${opMap[expr.op]}`);
     return result;
   }
 
@@ -147,28 +192,28 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
   }
 
   visitLogical(expr: Logical): string[] {
+    const endLabel = this.createLabel();
+    const result = expr.left.accept(this);
+
     if (expr.op === Token.AND_AND) {
-      const endLabel = this.createLabel();
-      const result = expr.left.accept(this);
       result.push(
         'cmp a 0',
         `jmp = ${endLabel}`
       );
-      result.push(...expr.right.accept(this));
-      result.push(`:${endLabel}`);
-      return result;
     } else if (expr.op === Token.OR_OR) {
-      const endLabel = this.createLabel();
-      const result = expr.left.accept(this);
       result.push(
         'cmp a 0',
         `jmp != ${endLabel}`
       );
-      result.push(...expr.right.accept(this));
-      result.push(`:${endLabel}`);
-      return result;
+    } else {
+      throw new CompileError(`Unknown logical operator: ${expr.op}`);
     }
-    throw new CompileError(`Unknown logical operator: ${expr.op}`);
+
+    result.push(
+      ...expr.right.accept(this),
+      `:${endLabel}`
+    );
+    return result;
   }
 
   visitCall(expr: Call): string[] {
@@ -201,23 +246,41 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
     return result;
   }
 
-  visitWhileStmt(stmt: While): string[] {
+  // Combine similar loop handling logic
+  private compileLoopBody(
+    condition: Expr | null,
+    body: Stmt,
+    increment: Expr | null = null
+  ): string[] {
     const startLabel = this.createLabel();
     const endLabel = this.createLabel();
     const result: string[] = [];
     
     result.push(`:${startLabel}`);
-    result.push(...stmt.condition.accept(this));
+    
+    if (condition) {
+      result.push(
+        ...condition.accept(this),
+        'cmp a 0',
+        `jmp = ${endLabel}`
+      );
+    }
+
+    result.push(...body.accept(this));
+    
+    if (increment) {
+      result.push(...increment.accept(this));
+    }
+
     result.push(
-      'cmp a 0',
-      `jmp = ${endLabel}`
+      `jmp ${startLabel}`,
+      `:${endLabel}`
     );
-    
-    result.push(...stmt.body.accept(this));
-    result.push(`jmp ${startLabel}`);
-    
-    result.push(`:${endLabel}`);
     return result;
+  }
+
+  visitWhileStmt(stmt: While): string[] {
+    return this.compileLoopBody(stmt.condition, stmt.body);
   }
 
   visitForStmt(stmt: For): string[] {
@@ -225,29 +288,11 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
     if (stmt.initializer) {
       result.push(...stmt.initializer.accept(this));
     }
-
-    const startLabel = this.createLabel();
-    const endLabel = this.createLabel();
-    const incrementLabel = this.createLabel();
-
-    result.push(`:${startLabel}`);
-    if (stmt.condition) {
-      result.push(...stmt.condition.accept(this));
-      result.push(
-        'cmp a 0',
-        `jmp = ${endLabel}`
-      );
-    }
-
-    result.push(...stmt.body.accept(this));
-
-    result.push(`:${incrementLabel}`);
-    if (stmt.increment) {
-      result.push(...stmt.increment.accept(this));
-    }
-
-    result.push(`jmp ${startLabel}`);
-    result.push(`:${endLabel}`);
+    result.push(...this.compileLoopBody(
+      stmt.condition,
+      stmt.body,
+      stmt.increment
+    ));
     return result;
   }
 

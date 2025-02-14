@@ -305,7 +305,7 @@ export class Parser {
   }
 
   private unary(): Expr {
-    if (this.match(Token.BANG, Token.MINUS)) {
+    if (this.match(Token.BANG, Token.MINUS, Token.TILDE)) {
       const operator = this.previous().token;
       const right = this.unary();
       return new Unary(operator, right);

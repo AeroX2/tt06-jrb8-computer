@@ -11,6 +11,7 @@ export enum Token {
   SEMICOLON = ";",
   SLASH = "/",
   STAR = "*",
+  TILDE = "~",
   // One or two character tokens
   BANG = "!",
   BANG_EQUAL = "!=",
@@ -42,7 +43,7 @@ export enum Token {
   OUT = "out",
   // Specials
   OVERFLOW = "overflow",
-  EOF = "eof"
+  EOF = "eof",
 }
 
 export interface TokenObj {

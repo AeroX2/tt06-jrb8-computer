@@ -1,0 +1,7 @@
+// Tests unary operations
+var x = 5
+
+out -x        // -5
+out !0        // 1
+out !(x > 3)  // 1
+out ~x        // 250 

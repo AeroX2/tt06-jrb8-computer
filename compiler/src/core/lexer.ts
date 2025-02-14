@@ -160,6 +160,7 @@ export class Lexer {
       case '+': this.addToken(Token.PLUS); break;
       case ';': this.addToken(Token.SEMICOLON); break;
       case '*': this.addToken(Token.STAR); break;
+      case '~': this.addToken(Token.TILDE); break;
       case '!': this.addToken(this.match('=') ? Token.BANG_EQUAL : Token.BANG); break;
       case '=': this.addToken(this.match('=') ? Token.EQUAL_EQUAL : Token.EQUAL); break;
       case '<': this.addToken(this.match('=') ? Token.LESS_EQUAL : Token.LESS); break;

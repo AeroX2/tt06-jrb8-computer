@@ -1,0 +1,15 @@
+// Tests logical operators
+var x = 5
+var y = 3
+var z = 0
+
+// AND tests
+out (x > y && y > z)  // 1
+out (x > y && z > y)  // 0
+
+// OR tests
+out (x > y || z > y)  // 1
+out (z > x || z > y)  // 0
+
+// Complex logic
+out (x > y && (y > z || x > 10))  // 1 

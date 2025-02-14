@@ -82,11 +82,12 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
       ...expr.left.accept(this),
       'mov a b',
       ...expr.right.accept(this),
-      'cmp b a'
+      'mov a c',
+      'opp 0',
+      'cmp b c'
     );
     
     const skipLabel = this.createLabel();
-    result.push('load rom a 0');
     
     const jumpMap: Partial<Record<Token, string>> = {
       [Token.GREATER]: '<=',
@@ -97,7 +98,8 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
     };
     
     result.push(`jmp ${jumpMap[expr.op]} ${skipLabel}`);
-    result.push('load rom a 1', `:${skipLabel}`);
+    result.push('opp 1');
+    result.push(`:${skipLabel}`);
     return result;
   }
 
@@ -150,8 +152,16 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
       case Token.MINUS:
         result.push('opp -a');
         break;
+      case Token.TILDE:
+        result.push('opp ~a');
+        break
       case Token.BANG:
+        const skipLabel = this.createLabel();
         result.push('cmp a 0');
+        result.push('opp 0');
+        result.push(`jmp != ${skipLabel}`);
+        result.push('opp 1');
+        result.push(`:${skipLabel}`);
         break;
     }
     
@@ -159,7 +169,7 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
   }
 
   visitLiteralBool(expr: LiteralBool): string[] {
-    return [`load rom a ${expr.val ? 1 : 0}`];
+    return [`opp ${expr.val ? 1 : 0}`];
   }
 
   visitLiteralString(expr: LiteralString): string[] {

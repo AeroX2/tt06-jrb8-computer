@@ -50,7 +50,7 @@ describe('Hardware VM Integration Tests', () => {
     expect(results).toEqual([13, 7, 30, 3]);
   });
 
-  test('loops work correctly', () => {
+  test('nested loops work correctly', () => {
     const results = runProgram('nested_loops.jrp');
     expect(results).toEqual([6]);
   });
@@ -63,5 +63,20 @@ describe('Hardware VM Integration Tests', () => {
   test('conditionals work correctly', () => {
     const results = runProgram('conditionals.jrp');
     expect(results).toEqual([1]);
+  });
+
+  test('logical operators work correctly', () => {
+    const results = runProgram('logical.jrp');
+    expect(results).toEqual([1, 0, 1, 0, 1]);
+  });
+
+  test('unary operations work correctly', () => {
+    const results = runProgram('unary.jrp');
+    expect(results).toEqual([-5 & 0xFF, 1, 1, 250]);
+  });
+
+  test('variable declarations without initializers work correctly', () => {
+    const results = runProgram('var_declarations.jrp');
+    expect(results).toEqual([5, 10, 15]);
   });
 }); 

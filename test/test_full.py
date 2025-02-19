@@ -52,7 +52,7 @@ async def wait_for_sclk(sclk, v):
         await Timer(5, "us")
 
 
-async def send_data(computer, sclk, ROM, address_24bit, cs_ram):
+async def send_data(computer, sclk, ROM, address_24bit, cs_ram, get_input):
     read_or_write = 0
     for i in range(8):
         await wait_for_sclk(sclk, 1)
@@ -93,6 +93,9 @@ async def send_data(computer, sclk, ROM, address_24bit, cs_ram):
     else:
         assert bin(read_or_write) == bin(0x03)
         data = ROM[address]
+        if (data >= 0xf0):
+            computer.ui_in.value = get_input()
+
         print("Reading ROM from", address, "which is", data)
 
         for i in range(8):
@@ -145,7 +148,7 @@ async def send_data(computer, sclk, ROM, address_24bit, cs_ram):
 #         await wait_for_sclk(sclk, 0)
 #         computer.uio_in[2].value = 0
 
-async def run(dut, ROM, cycles, address_24bit):
+async def run(dut, ROM, cycles, address_24bit = False, inputs = []):
     computer, clk, sclk = await setup(dut)
 
     # Only for debugging
@@ -155,6 +158,13 @@ async def run(dut, ROM, cycles, address_24bit):
 
     outputs = []
     previous_output = None
+
+    current_input = -1
+    def get_input():
+        nonlocal current_input
+        current_input += 1    
+        return inputs[current_input] if (0 <= current_input and current_input < len(inputs)) else 0
+
     for cycle in range(cycles):
         await ClockCycles(clk, 1)
 
@@ -169,7 +179,14 @@ async def run(dut, ROM, cycles, address_24bit):
 
             v = (cs_rom) if address_24bit else (cs_rom | cs_ram)
             if (v):
-                await send_data(computer, sclk, ROM, address_24bit, cs_ram and not address_24bit)
+                await send_data(
+                    computer,
+                    sclk,
+                    ROM,
+                    address_24bit,
+                    cs_ram and not address_24bit,
+                    get_input,
+                )
         except Exception as e:
             print(e)
             print(f"Failure at cycle: {cycle}")
@@ -179,12 +196,12 @@ async def run(dut, ROM, cycles, address_24bit):
     return outputs
 
 
-async def load_and_run(dut, path, steps, address_24bit=False):
+async def load_and_run(dut, path, steps, address_24bit=False, inputs = []):
     with open(path, "r") as f:
         program_d = f.readlines()
     program_b = [int(x, 16) for x in program_d[1].split()]
 
-    return await run(dut, program_b, steps, address_24bit)
+    return await run(dut, program_b, steps, address_24bit, inputs)
 
 
 def string_to_dict(s):
@@ -214,6 +231,18 @@ async def test_output_example(dut):
     assert outputs[1] == 13
     assert outputs[2] == 37
     assert outputs[3] == 74
+
+@cocotb.test()
+async def test_input_example(dut):
+    outputs = await load_and_run(dut, "../example_programs/assembly/input_program.o", 200, False, [41,42,43])
+    assert outputs[1] == -1 & 0xFF
+    assert outputs[2] == 0
+    assert outputs[3] == 1
+
+    outputs = await load_and_run(dut, "../example_programs/assembly/input_program.o", 200, True, [41,42,43])
+    assert outputs[1] == -1 & 0xFF
+    assert outputs[2] == 0
+    assert outputs[3] == 1
 
 
 @cocotb.test()

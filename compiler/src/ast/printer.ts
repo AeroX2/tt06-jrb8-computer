@@ -1,4 +1,4 @@
-import { ExprVisitor } from './expressions';
+import { ExprVisitor, Input } from './expressions';
 import { StmtVisitor } from './statements';
 import {
   Expr, Binary, Grouping, Unary, LiteralBool,
@@ -47,6 +47,10 @@ export class ASTPrinter implements ExprVisitor<string>, StmtVisitor<string> {
 
   visitLogical(expr: Logical): string {
     return `[${expr.left.accept(this)} ${expr.op} ${expr.right.accept(this)}]`;
+  }
+
+  visitInput(expr: Input): string {
+    return `in`
   }
 
   visitCall(expr: Call): string {

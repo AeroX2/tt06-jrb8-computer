@@ -66,47 +66,69 @@ export class Lexer {
     return this.source[this.current];
   }
 
-  private peekNext(): string {
-    if (this.current + 1 >= this.source.length) return '\0';
-    return this.source[this.current + 1];
-  }
-
   private isDigit(c: string): boolean {
     return c >= '0' && c <= '9';
   }
 
   private isAlpha(c: string): boolean {
     return (c >= 'a' && c <= 'z') ||
-           (c >= 'A' && c <= 'Z') ||
-           c === '_';
+      (c >= 'A' && c <= 'Z') ||
+      c === '_';
   }
 
   private isAlphaNumeric(c: string): boolean {
     return this.isAlpha(c) || this.isDigit(c);
   }
 
+  private isHexDigit(c: string): boolean {
+    return /[0-9a-fA-F]/.test(c);
+  }
+
+  private isOctalDigit(c: string): boolean {
+    return /[0-7]/.test(c);
+  }
+
+  private isBinaryDigit(c: string): boolean {
+    return c === '0' || c === '1';
+  }
+
   private number() {
+    const nextChar = this.peek().toLowerCase();
+    if (nextChar === 'x' || nextChar === 'o' || nextChar === 'b') {
+      // Consume 'x', 'o', or 'b'
+      this.advance();
+
+      // Select validator and base based on prefix
+      const { fn: validator, base } = {
+        'x': {
+          fn: this.isHexDigit.bind(this),
+          base: 16
+        },
+        'o': {
+          fn: this.isOctalDigit.bind(this), base: 8
+        },
+        'b': { fn: this.isBinaryDigit.bind(this), base: 2 }
+      }[nextChar];
+      // Process digits
+      while (validator(this.peek())) {
+        this.advance();
+      }
+
+      const value = this.source.substring(this.start+2, this.current);
+      this.addToken(Token.NUMBER, parseInt(value, base).toString());
+      return;
+    }
+
     while (this.isDigit(this.peek())) {
       this.advance();
     }
-
-    // Look for a fractional part
-    if (this.peek() === '.' && this.isDigit(this.peekNext())) {
-      // Consume the "."
-      this.advance();
-
-      while (this.isDigit(this.peek())) {
-        this.advance();
-      }
-    }
-
     const value = this.source.substring(this.start, this.current);
     this.addToken(Token.NUMBER, value);
   }
 
   private string() {
     let value = '';
-    
+
     while (this.peek() !== '"' && !this.isAtEnd()) {
       if (this.peek() === '\\') {
         this.advance(); // Consume the backslash

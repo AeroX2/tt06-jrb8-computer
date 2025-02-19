@@ -1,6 +1,7 @@
 import { 
   Expr, ExprVisitor, Binary, Grouping, Unary, LiteralBool,
-  LiteralString, LiteralNumber, Variable, Assign, Logical, Call
+  LiteralString, LiteralNumber, Variable, Assign, Logical, Call,
+  Input
 } from '../ast/expressions';
 import {
   Stmt, StmtVisitor, Expression, If, While, For,
@@ -130,7 +131,9 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
     
     const opMap: Partial<Record<Token, string>> = {
       [Token.PLUS]: 'a+b',
-      [Token.STAR]: 'a*b'
+      [Token.STAR]: 'a*b',
+      [Token.AND]: 'a&b',
+      [Token.OR]: 'a|b'
     };
     
     if (!opMap[expr.op]) {
@@ -180,7 +183,18 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
     if (expr.val < 0 || expr.val > 255) {
       throw new CompileError("Number out of range (0-255)");
     }
+    if (expr.val === 0) {
+      return ['opp 0'];
+    } else if (expr.val === 1) {
+      return ['opp 1'];
+    } else if (expr.val === -1) {
+      return ['opp -1'];
+    }
     return [`load rom a ${expr.val}`];
+  }
+
+  visitInput(expr: Input): string[] {
+    return [`in a`]
   }
 
   visitVariable(expr: Variable): string[] {

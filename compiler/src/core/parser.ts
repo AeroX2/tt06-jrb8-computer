@@ -1,10 +1,11 @@
 import { Token, TokenObj } from './tokens';
 import {
   Expr, Binary, Grouping, Unary, LiteralBool,
-  LiteralString, LiteralNumber, Variable, Assign, Logical, Call
+  LiteralString, LiteralNumber, Variable, Assign, Logical, Call,
+  Input
 } from '../ast/expressions';
 import {
-  Stmt, Expression, If, While, For, Block, Var, Function, Return, Output
+  Stmt, Expression, If, While, For, Block, Var, Function, Return, Output,
 } from '../ast/statements';
 import { ASTPrinter } from '../ast/printer';
 
@@ -70,20 +71,15 @@ export class Parser {
   }
 
   private declaration(): Stmt | null {
-    try {
-      if (this.match(Token.FUN)) return this.function("function");
-      if (this.match(Token.VAR)) return this.varDeclaration();
-      return this.statement();
-    } catch (error) {
-      this.synchronize();
-      return null;
-    }
+    if (this.match(Token.FUN)) return this.function("function");
+    if (this.match(Token.VAR)) return this.varDeclaration();
+    return this.statement();
   }
 
   private function(kind: string): Function {
     const name = this.consume(Token.IDENTIFIER, `Expect ${kind} name.`).value!;
     this.consume(Token.LEFT_PAREN, `Expect '(' after ${kind} name.`);
-    
+
     const parameters: string[] = [];
     if (!this.check(Token.RIGHT_PAREN)) {
       do {
@@ -93,11 +89,11 @@ export class Parser {
         parameters.push(this.consume(Token.IDENTIFIER, "Expect parameter name.").value!);
       } while (this.match(Token.COMMA));
     }
-    
+
     this.consume(Token.RIGHT_PAREN, "Expect ')' after parameters.");
     this.consume(Token.LEFT_BRACE, `Expect '{' before ${kind} body.`);
     const body = this.block();
-    
+
     return new Function(name, parameters, body);
   }
 
@@ -219,7 +215,7 @@ export class Parser {
     const expr = this.or();
 
     if (this.match(Token.EQUAL)) {
-      const equals = this.previous();
+      // const equals = this.previous();
       const value = this.assignment();
 
       if (expr instanceof Variable) {
@@ -269,9 +265,21 @@ export class Parser {
   }
 
   private comparison(): Expr {
-    let expr = this.term();
+    let expr = this.bitwise();
 
     while (this.match(Token.GREATER, Token.GREATER_EQUAL, Token.LESS, Token.LESS_EQUAL)) {
+      const operator = this.previous().token;
+      const right = this.bitwise();
+      expr = new Binary(expr, operator, right);
+    }
+
+    return expr;
+  }
+
+  private bitwise(): Expr {
+    let expr = this.term();
+
+    while (this.match(Token.AND, Token.OR)) {
       const operator = this.previous().token;
       const right = this.term();
       expr = new Binary(expr, operator, right);
@@ -360,6 +368,10 @@ export class Parser {
       return new LiteralString(value);
     }
 
+    if (this.match(Token.IN)) {
+      return new Input()
+    }
+
     if (this.match(Token.IDENTIFIER)) {
       return new Variable(this.previous());
     }
@@ -372,24 +384,4 @@ export class Parser {
 
     throw new ParserError(`Unexpected token: ${this.peek().token}`);
   }
-
-  private synchronize() {
-    this.advance();
-
-    while (!this.isAtEnd()) {
-      if (this.previous().token === Token.SEMICOLON) return;
-
-      switch (this.peek().token) {
-        case Token.FUN:
-        case Token.VAR:
-        case Token.FOR:
-        case Token.IF:
-        case Token.WHILE:
-        case Token.RETURN:
-          return;
-      }
-
-      this.advance();
-    }
-  }
-} 
+}

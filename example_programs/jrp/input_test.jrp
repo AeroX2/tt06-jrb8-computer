@@ -1,0 +1,22 @@
+while (true) {
+    var inp = in
+    if (inp & 0b1 == 0b1) {
+        out 0b00000110
+    } else if (inp & 0b10 == 0b10) {
+        out 0b01011011
+    } else if (inp & 0b100 == 0b100) {
+        out 0b01001111
+    } else if (inp & 0b1000 == 0b1000) {
+        out 0b01100110
+    } else if (inp & 0b10000 == 0b10000) {
+        out 0b01101101
+    } else if (inp & 0b100000 == 0b100000) {
+        out 0b01111101
+    } else if (inp & 0b1000000 == 0b1000000) {
+        out 0b00000111
+    } else if (inp & 0b10000000 == 0b10000000) {
+        out 0b01111111
+    } else {
+        out 0b00111111
+    }
+}

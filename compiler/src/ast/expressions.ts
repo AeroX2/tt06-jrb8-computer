@@ -11,6 +11,7 @@ export interface ExprVisitor<T> {
   visitVariable(expr: Variable): T;
   visitAssign(expr: Assign): T;
   visitLogical(expr: Logical): T;
+  visitInput(expr: Input): T;
   visitCall(expr: Call): T;
 }
 
@@ -133,5 +134,15 @@ export class Call extends Expr {
 
   accept<T>(visitor: ExprVisitor<T>): T {
     return visitor.visitCall(this);
+  }
+} 
+
+export class Input extends Expr {
+  constructor() {
+    super();
+  }
+
+  accept<T>(visitor: ExprVisitor<T>): T {
+    return visitor.visitInput(this);
   }
 } 

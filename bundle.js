@@ -33,17 +33,17 @@ var jrb8Compiler = (() => {
     }
   };
   var Keywords = {
-    "var": "var" /* VAR */,
-    "if": "if" /* IF */,
-    "else": "else" /* ELSE */,
-    "true": "true" /* TRUE */,
-    "false": "false" /* FALSE */,
-    "for": "for" /* FOR */,
-    "while": "while" /* WHILE */,
-    "fun": "fun" /* FUN */,
-    "return": "return" /* RETURN */,
-    "out": "out" /* OUT */,
-    "in": "in" /* IN */
+    var: "var" /* VAR */,
+    if: "if" /* IF */,
+    else: "else" /* ELSE */,
+    true: "true" /* TRUE */,
+    false: "false" /* FALSE */,
+    for: "for" /* FOR */,
+    while: "while" /* WHILE */,
+    fun: "fun" /* FUN */,
+    return: "return" /* RETURN */,
+    out: "out" /* OUT */,
+    in: "in" /* IN */
   };
   var Lexer = class {
     source;
@@ -85,11 +85,6 @@ var jrb8Compiler = (() => {
         return "\0";
       return this.source[this.current];
     }
-    peekNext() {
-      if (this.current + 1 >= this.source.length)
-        return "\0";
-      return this.source[this.current + 1];
-    }
     isDigit(c) {
       return c >= "0" && c <= "9";
     }
@@ -99,15 +94,39 @@ var jrb8Compiler = (() => {
     isAlphaNumeric(c) {
       return this.isAlpha(c) || this.isDigit(c);
     }
+    isHexDigit(c) {
+      return /[0-9a-fA-F]/.test(c);
+    }
+    isOctalDigit(c) {
+      return /[0-7]/.test(c);
+    }
+    isBinaryDigit(c) {
+      return c === "0" || c === "1";
+    }
     number() {
-      while (this.isDigit(this.peek())) {
+      const nextChar = this.peek().toLowerCase();
+      if (nextChar === "x" || nextChar === "o" || nextChar === "b") {
         this.advance();
-      }
-      if (this.peek() === "." && this.isDigit(this.peekNext())) {
-        this.advance();
-        while (this.isDigit(this.peek())) {
+        const { fn: validator, base } = {
+          x: {
+            fn: this.isHexDigit.bind(this),
+            base: 16
+          },
+          o: {
+            fn: this.isOctalDigit.bind(this),
+            base: 8
+          },
+          b: { fn: this.isBinaryDigit.bind(this), base: 2 }
+        }[nextChar];
+        while (validator(this.peek())) {
           this.advance();
         }
+        const value2 = this.source.substring(this.start + 2, this.current);
+        this.addToken("number" /* NUMBER */, parseInt(value2, base).toString());
+        return;
+      }
+      while (this.isDigit(this.peek())) {
+        this.advance();
       }
       const value = this.source.substring(this.start, this.current);
       this.addToken("number" /* NUMBER */, value);
@@ -133,9 +152,7 @@ var jrb8Compiler = (() => {
         this.advance();
       }
       const text = this.source.substring(this.start, this.current);
-      let token = Keywords[text];
-      if (!token)
-        token = "identifier" /* IDENTIFIER */;
+      const token = Keywords[text] ?? "identifier" /* IDENTIFIER */;
       this.addToken(token, text);
     }
     scanTokens() {
@@ -178,6 +195,9 @@ var jrb8Compiler = (() => {
           break;
         case "*":
           this.addToken("*" /* STAR */);
+          break;
+        case "~":
+          this.addToken("~" /* TILDE */);
           break;
         case "!":
           this.addToken(this.match("=") ? "!=" /* BANG_EQUAL */ : "!" /* BANG */);
@@ -331,6 +351,14 @@ var jrb8Compiler = (() => {
       return visitor.visitCall(this);
     }
   };
+  var Input = class extends Expr {
+    constructor() {
+      super();
+    }
+    accept(visitor) {
+      return visitor.visitInput(this);
+    }
+  };
 
   // src/ast/statements.ts
   var Stmt = class {
@@ -482,16 +510,11 @@ var jrb8Compiler = (() => {
       return statements;
     }
     declaration() {
-      try {
-        if (this.match("fun" /* FUN */))
-          return this.function("function");
-        if (this.match("var" /* VAR */))
-          return this.varDeclaration();
-        return this.statement();
-      } catch (error) {
-        this.synchronize();
-        return null;
-      }
+      if (this.match("fun" /* FUN */))
+        return this.function("function");
+      if (this.match("var" /* VAR */))
+        return this.varDeclaration();
+      return this.statement();
     }
     function(kind) {
       const name = this.consume("identifier" /* IDENTIFIER */, `Expect ${kind} name.`).value;
@@ -572,11 +595,10 @@ var jrb8Compiler = (() => {
         increment = this.expression();
       }
       this.consume(")" /* RIGHT_PAREN */, "Expect ')' after for clauses.");
-      let body = this.statement();
+      const body = this.statement();
       return new For(initializer, condition, increment, body);
     }
     returnStatement() {
-      const keyword = this.previous();
       let value = null;
       if (!this.check(";" /* SEMICOLON */) && !this.check("}" /* RIGHT_BRACE */)) {
         value = this.expression();
@@ -610,7 +632,6 @@ var jrb8Compiler = (() => {
     assignment() {
       const expr = this.or();
       if (this.match("=" /* EQUAL */)) {
-        const equals = this.previous();
         const value = this.assignment();
         if (expr instanceof Variable) {
           return new Assign(expr.name, value);
@@ -647,8 +668,17 @@ var jrb8Compiler = (() => {
       return expr;
     }
     comparison() {
-      let expr = this.term();
+      let expr = this.bitwise();
       while (this.match(">" /* GREATER */, ">=" /* GREATER_EQUAL */, "<" /* LESS */, "<=" /* LESS_EQUAL */)) {
+        const operator = this.previous().token;
+        const right = this.bitwise();
+        expr = new Binary(expr, operator, right);
+      }
+      return expr;
+    }
+    bitwise() {
+      let expr = this.term();
+      while (this.match("&" /* AND */, "|" /* OR */)) {
         const operator = this.previous().token;
         const right = this.term();
         expr = new Binary(expr, operator, right);
@@ -674,7 +704,7 @@ var jrb8Compiler = (() => {
       return expr;
     }
     unary() {
-      if (this.match("!" /* BANG */, "-" /* MINUS */)) {
+      if (this.match("!" /* BANG */, "-" /* MINUS */, "~" /* TILDE */)) {
         const operator = this.previous().token;
         const right = this.unary();
         return new Unary(operator, right);
@@ -722,6 +752,9 @@ var jrb8Compiler = (() => {
           throw new ParserError("String token has no value");
         return new LiteralString(value);
       }
+      if (this.match("in" /* IN */)) {
+        return new Input();
+      }
       if (this.match("identifier" /* IDENTIFIER */)) {
         return new Variable(this.previous());
       }
@@ -732,28 +765,11 @@ var jrb8Compiler = (() => {
       }
       throw new ParserError(`Unexpected token: ${this.peek().token}`);
     }
-    synchronize() {
-      this.advance();
-      while (!this.isAtEnd()) {
-        if (this.previous().token === ";" /* SEMICOLON */)
-          return;
-        switch (this.peek().token) {
-          case "fun" /* FUN */:
-          case "var" /* VAR */:
-          case "for" /* FOR */:
-          case "if" /* IF */:
-          case "while" /* WHILE */:
-          case "return" /* RETURN */:
-            return;
-        }
-        this.advance();
-      }
-    }
   };
 
   // src/utils/cu_flags.ts
   var CU_FLAGS = {
-    "nop": 0,
+    nop: 0,
     "mov a b": 1,
     "mov a c": 2,
     "mov a d": 3,
@@ -994,7 +1010,7 @@ var jrb8Compiler = (() => {
     "out ram[b]": 251,
     "out ram[c]": 252,
     "out ram[d]": 253,
-    "halt": 255
+    halt: 255
   };
 
   // src/core/assembler.ts
@@ -1044,17 +1060,17 @@ var jrb8Compiler = (() => {
     }
     // Define operations map with proper type
     operations = {
-      "nop": (x) => x === "",
-      "mov": (x) => this.checkMov(x),
-      "cmp": (x) => x.match(COMPARE) !== null,
-      "jmp": (x) => x.match(JUMP) !== null,
-      "jmpr": (x) => x.match(JUMP) !== null,
-      "opp": (x) => true,
-      "load": (x) => this.checkLoad(x),
-      "save": (x) => this.checkSave(x),
-      "in": (x) => x.match(REGISTER) !== null,
-      "out": (x) => x.match(OUT_PATTERN) !== null,
-      "halt": (x) => x === ""
+      nop: (x) => x === "",
+      mov: (x) => this.checkMov(x),
+      cmp: (x) => x.match(COMPARE) !== null,
+      jmp: (x) => x.match(JUMP) !== null,
+      jmpr: (x) => x.match(JUMP) !== null,
+      opp: () => true,
+      load: (x) => this.checkLoad(x),
+      save: (x) => this.checkSave(x),
+      in: (x) => x.match(REGISTER) !== null,
+      out: (x) => x.match(OUT_PATTERN) !== null,
+      halt: (x) => x === ""
     };
     // Get translation stage two instructions (those with {label} or {number})
     translationKeys = Object.keys(CU_FLAGS);
@@ -1201,11 +1217,20 @@ var jrb8Compiler = (() => {
       this.name = "CompileError";
     }
   };
-  var HardwareCompiler = class {
+  var HardwareCompiler = class _HardwareCompiler {
     variables = /* @__PURE__ */ new Map();
     nextVarAddress = 0;
     labelCounter = 0;
-    compile(statements) {
+    // Group related operators into constants for better maintainability
+    static COMPARISON_OPERATORS = /* @__PURE__ */ new Set([
+      ">" /* GREATER */,
+      ">=" /* GREATER_EQUAL */,
+      "<" /* LESS */,
+      "<=" /* LESS_EQUAL */,
+      "==" /* EQUAL_EQUAL */
+    ]);
+    static RIGHT_EVAL_FIRST_OPERATORS = /* @__PURE__ */ new Set(["-" /* MINUS */, "/" /* SLASH */]);
+    compileToAssembly(statements) {
       this.variables.clear();
       this.nextVarAddress = 0;
       this.labelCounter = 0;
@@ -1213,9 +1238,12 @@ var jrb8Compiler = (() => {
       for (const stmt of statements) {
         assemblyLines.push(...stmt.accept(this));
       }
-      console.log("Generated assembly:", assemblyLines.join("\n"));
+      assemblyLines.push("halt");
+      return assemblyLines;
+    }
+    compileToBytecode(assembly) {
       const assembler = new Assembler();
-      const bytecode = assembler.assemble(assemblyLines);
+      const bytecode = assembler.assemble(assembly);
       const resolvedBytecode = assembler.hexOutput(bytecode);
       if (resolvedBytecode.length === 0) {
         throw new CompileError("Failed to resolve all labels in the bytecode");
@@ -1229,35 +1257,60 @@ var jrb8Compiler = (() => {
       return expr.accept(this);
     }
     visitBinary(expr) {
-      const result = [];
-      if (expr.op === "-" /* MINUS */) {
-        result.push(...expr.right.accept(this));
-        result.push("mov a b");
-        result.push(...expr.left.accept(this));
-        result.push("opp a-b");
+      if (_HardwareCompiler.COMPARISON_OPERATORS.has(expr.op)) {
+        return this.handleComparison(expr);
+      } else if (_HardwareCompiler.RIGHT_EVAL_FIRST_OPERATORS.has(expr.op)) {
+        return this.handleRightFirst(expr);
       } else {
-        result.push(...expr.left.accept(this));
-        result.push("mov a b");
-        result.push(...expr.right.accept(this));
-        switch (expr.op) {
-          case "+" /* PLUS */:
-            result.push("opp a+b");
-            break;
-          case "*" /* STAR */:
-            result.push("opp a*b");
-            break;
-          case "/" /* SLASH */:
-            result.push("opp a/b");
-            break;
-          case ">" /* GREATER */:
-          case ">=" /* GREATER_EQUAL */:
-          case "<" /* LESS */:
-          case "<=" /* LESS_EQUAL */:
-          case "==" /* EQUAL_EQUAL */:
-            result.push("cmp a b");
-            break;
-        }
+        return this.handleLeftFirst(expr);
       }
+    }
+    handleComparison(expr) {
+      const result = [];
+      result.push(
+        ...expr.left.accept(this),
+        "mov a b",
+        ...expr.right.accept(this),
+        "mov a c",
+        "opp 0",
+        "cmp b c"
+      );
+      const skipLabel = this.createLabel();
+      const jumpMap = {
+        [">" /* GREATER */]: "<=",
+        [">=" /* GREATER_EQUAL */]: "<",
+        ["<" /* LESS */]: ">=",
+        ["<=" /* LESS_EQUAL */]: ">",
+        ["==" /* EQUAL_EQUAL */]: "!="
+      };
+      result.push(`jmp ${jumpMap[expr.op]} ${skipLabel}`);
+      result.push("opp 1");
+      result.push(`:${skipLabel}`);
+      return result;
+    }
+    handleRightFirst(expr) {
+      const result = [];
+      result.push(...expr.right.accept(this), "mov a b", ...expr.left.accept(this));
+      const opMap = {
+        ["-" /* MINUS */]: "a-b",
+        ["/" /* SLASH */]: "a/b"
+      };
+      result.push(`opp ${opMap[expr.op]}`);
+      return result;
+    }
+    handleLeftFirst(expr) {
+      const result = [];
+      result.push(...expr.left.accept(this), "mov a b", ...expr.right.accept(this));
+      const opMap = {
+        ["+" /* PLUS */]: "a+b",
+        ["*" /* STAR */]: "a*b",
+        ["&" /* AND */]: "a&b",
+        ["|" /* OR */]: "a|b"
+      };
+      if (opMap[expr.op] === void 0) {
+        throw new CompileError(`Unknown binary operator: ${expr.op}`);
+      }
+      result.push(`opp ${opMap[expr.op]}`);
       return result;
     }
     visitGrouping(expr) {
@@ -1269,26 +1322,45 @@ var jrb8Compiler = (() => {
         case "-" /* MINUS */:
           result.push("opp -a");
           break;
-        case "!" /* BANG */:
-          result.push("cmp a 0");
+        case "~" /* TILDE */:
+          result.push("opp ~a");
           break;
+        case "!" /* BANG */: {
+          const skipLabel = this.createLabel();
+          result.push("cmp a 0");
+          result.push("opp 0");
+          result.push(`jmp != ${skipLabel}`);
+          result.push("opp 1");
+          result.push(`:${skipLabel}`);
+          break;
+        }
       }
       return result;
     }
     visitLiteralBool(expr) {
-      return [`load rom a ${expr.val ? 1 : 0}`];
+      return [`opp ${expr.val ? 1 : 0}`];
     }
-    visitLiteralString(expr) {
+    visitLiteralString(_expr) {
       throw new CompileError("String literals not supported in hardware implementation");
     }
     visitLiteralNumber(expr) {
       if (expr.val < 0 || expr.val > 255) {
         throw new CompileError("Number out of range (0-255)");
       }
+      if (expr.val === 0) {
+        return ["opp 0"];
+      } else if (expr.val === 1) {
+        return ["opp 1"];
+      } else if (expr.val === -1) {
+        return ["opp -1"];
+      }
       return [`load rom a ${expr.val}`];
     }
+    visitInput(_expr) {
+      return [`in a`];
+    }
     visitVariable(expr) {
-      const address = this.variables.get(expr.name.value || "");
+      const address = this.variables.get(expr.name.value ?? "");
       if (address === void 0) {
         throw new CompileError(`Undefined variable: ${expr.name.value}`);
       }
@@ -1296,7 +1368,7 @@ var jrb8Compiler = (() => {
     }
     visitAssign(expr) {
       const result = expr.value.accept(this);
-      const address = this.variables.get(expr.name.value || "");
+      const address = this.variables.get(expr.name.value ?? "");
       if (address === void 0) {
         throw new CompileError(`Undefined variable: ${expr.name.value}`);
       }
@@ -1304,30 +1376,19 @@ var jrb8Compiler = (() => {
       return result;
     }
     visitLogical(expr) {
+      const endLabel = this.createLabel();
+      const result = expr.left.accept(this);
       if (expr.op === "&&" /* AND_AND */) {
-        const endLabel = this.createLabel();
-        const result = expr.left.accept(this);
-        result.push(
-          "cmp a 0",
-          `jmp = ${endLabel}`
-        );
-        result.push(...expr.right.accept(this));
-        result.push(`:${endLabel}`);
-        return result;
+        result.push("cmp a 0", `jmp = ${endLabel}`);
       } else if (expr.op === "||" /* OR_OR */) {
-        const endLabel = this.createLabel();
-        const result = expr.left.accept(this);
-        result.push(
-          "cmp a 0",
-          `jmp != ${endLabel}`
-        );
-        result.push(...expr.right.accept(this));
-        result.push(`:${endLabel}`);
-        return result;
+        result.push("cmp a 0", `jmp != ${endLabel}`);
+      } else {
+        throw new CompileError(`Unknown logical operator: ${expr.op}`);
       }
-      throw new CompileError(`Unknown logical operator: ${expr.op}`);
+      result.push(...expr.right.accept(this), `:${endLabel}`);
+      return result;
     }
-    visitCall(expr) {
+    visitCall(_expr) {
       throw new CompileError("Function calls not yet implemented for hardware");
     }
     visitExpressionStmt(stmt) {
@@ -1337,10 +1398,7 @@ var jrb8Compiler = (() => {
       const result = stmt.condition.accept(this);
       const elseLabel = this.createLabel();
       const endLabel = this.createLabel();
-      result.push(
-        "cmp a 0",
-        `jmp = ${elseLabel}`
-      );
+      result.push("cmp a 0", `jmp = ${elseLabel}`);
       result.push(...stmt.thenBranch.accept(this));
       result.push(`jmp ${endLabel}`);
       result.push(`:${elseLabel}`);
@@ -1350,44 +1408,31 @@ var jrb8Compiler = (() => {
       result.push(`:${endLabel}`);
       return result;
     }
-    visitWhileStmt(stmt) {
+    // Combine similar loop handling logic
+    compileLoopBody(condition, body, increment = null) {
       const startLabel = this.createLabel();
       const endLabel = this.createLabel();
       const result = [];
       result.push(`:${startLabel}`);
-      result.push(...stmt.condition.accept(this));
-      result.push(
-        "cmp a 0",
-        `jmp = ${endLabel}`
-      );
-      result.push(...stmt.body.accept(this));
-      result.push(`jmp ${startLabel}`);
-      result.push(`:${endLabel}`);
+      if (condition) {
+        result.push(...condition.accept(this), "cmp a 0", `jmp = ${endLabel}`);
+      }
+      result.push(...body.accept(this));
+      if (increment) {
+        result.push(...increment.accept(this));
+      }
+      result.push(`jmp ${startLabel}`, `:${endLabel}`);
       return result;
+    }
+    visitWhileStmt(stmt) {
+      return this.compileLoopBody(stmt.condition, stmt.body);
     }
     visitForStmt(stmt) {
       const result = [];
       if (stmt.initializer) {
         result.push(...stmt.initializer.accept(this));
       }
-      const startLabel = this.createLabel();
-      const endLabel = this.createLabel();
-      const incrementLabel = this.createLabel();
-      result.push(`:${startLabel}`);
-      if (stmt.condition) {
-        result.push(...stmt.condition.accept(this));
-        result.push(
-          "cmp a 0",
-          `jmp = ${endLabel}`
-        );
-      }
-      result.push(...stmt.body.accept(this));
-      result.push(`:${incrementLabel}`);
-      if (stmt.increment) {
-        result.push(...stmt.increment.accept(this));
-      }
-      result.push(`jmp ${startLabel}`);
-      result.push(`:${endLabel}`);
+      result.push(...this.compileLoopBody(stmt.condition, stmt.body, stmt.increment));
       return result;
     }
     visitBlockStmt(stmt) {
@@ -1403,17 +1448,14 @@ var jrb8Compiler = (() => {
       const address = this.nextVarAddress++;
       this.variables.set(varName, address);
       if (stmt.initializer) {
-        result.push(
-          ...stmt.initializer.accept(this),
-          `save a ram[${address}]`
-        );
+        result.push(...stmt.initializer.accept(this), `save a ram[${address}]`);
       }
       return result;
     }
-    visitFunctionStmt(stmt) {
+    visitFunctionStmt(_stmt) {
       throw new CompileError("Functions not yet implemented for hardware");
     }
-    visitReturnStmt(stmt) {
+    visitReturnStmt(_stmt) {
       throw new CompileError("Return not yet implemented for hardware");
     }
     visitOutputStmt(stmt) {
@@ -1437,11 +1479,11 @@ var jrb8Compiler = (() => {
       const parser = new Parser(tokens);
       const ast = parser.parse();
       const compiler = new HardwareCompiler();
-      const machineCode = compiler.compile(ast);
-      const hexCode = machineCode.map((byte) => byte.toString(16).padStart(2, "0"));
+      const assembly = compiler.compileToAssembly(ast);
+      const machineCode = compiler.compileToBytecode(assembly);
       return {
-        machineCode,
-        hexCode
+        assembly,
+        machineCode
       };
     } catch (error) {
       throw new CompileError2(error instanceof Error ? error.message : "Unknown compilation error");

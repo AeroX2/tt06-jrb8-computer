@@ -56,12 +56,12 @@ export interface TokenObj {
 export class ParserException extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'ParserException';
+    this.name = "ParserException";
   }
 }
 
 export class TokenStream {
-  private buffer: TokenObj[];
+  private readonly buffer: TokenObj[];
   private position: number;
 
   constructor(data: TokenObj[]) {
@@ -73,13 +73,13 @@ export class TokenStream {
     if (this.position < this.buffer.length) {
       return this.buffer[this.position];
     }
-    throw new ParserException('Attempted to peek past the end of the stream');
+    throw new ParserException("Attempted to peek past the end of the stream");
   }
 
   read(): TokenObj {
     if (this.position < this.buffer.length) {
       return this.buffer[this.position++];
     }
-    throw new ParserException('Attempted to read past the end of the stream');
+    throw new ParserException("Attempted to read past the end of the stream");
   }
-} 
+}

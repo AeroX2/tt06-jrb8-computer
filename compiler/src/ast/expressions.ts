@@ -1,4 +1,4 @@
-import { Token, TokenObj } from '../core/tokens';
+import { Token, TokenObj } from "../core/tokens";
 
 export interface ExprVisitor<T> {
   visit(expr: Expr): T;
@@ -135,7 +135,7 @@ export class Call extends Expr {
   accept<T>(visitor: ExprVisitor<T>): T {
     return visitor.visitCall(this);
   }
-} 
+}
 
 export class Input extends Expr {
   constructor() {
@@ -145,4 +145,4 @@ export class Input extends Expr {
   accept<T>(visitor: ExprVisitor<T>): T {
     return visitor.visitInput(this);
   }
-} 
+}

@@ -1,18 +1,18 @@
-import { CU_FLAGS } from '../utils/cu_flags';
+import { CU_FLAGS } from "../utils/cu_flags";
 
 export enum HexOrLabelKind {
   HEX,
-  LABEL
+  LABEL,
 }
 
-export type HexOrLabel = 
+export type HexOrLabel =
   | { kind: HexOrLabelKind.HEX; hex: number }
   | { kind: HexOrLabelKind.LABEL; label: string };
 
 export class AssemblerError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'AssemblerError';
+    this.name = "AssemblerError";
   }
 }
 
@@ -33,8 +33,8 @@ const OUT_PATTERN = /[abcd]|[0-9]+|ram\[[0-9]+\]|ram\[[abcd]\]/;
 
 export class Assembler {
   private final: HexOrLabel[] = [];
-  private labels = new Map<string, number>();
-  private offset = { value: 0 };
+  private readonly labels = new Map<string, number>();
+  private readonly offset = { value: 0 };
 
   // Helper functions for instruction checking
   private checkMov(args: string): boolean {
@@ -56,31 +56,31 @@ export class Assembler {
   }
 
   // Define operations map with proper type
-  private operations: Record<string, (x: string) => boolean> = {
-    "nop": (x: string) => x === "",
-    "mov": (x: string) => this.checkMov(x),
-    "cmp": (x: string) => x.match(COMPARE) !== null,
-    "jmp": (x: string) => x.match(JUMP) !== null,
-    "jmpr": (x: string) => x.match(JUMP) !== null,
-    "opp": (x: string) => true,
-    "load": (x: string) => this.checkLoad(x),
-    "save": (x: string) => this.checkSave(x),
-    "in": (x: string) => x.match(REGISTER) !== null,
-    "out": (x: string) => x.match(OUT_PATTERN) !== null,
-    "halt": (x: string) => x === "",
+  private readonly operations: Record<string, (x: string) => boolean> = {
+    nop: (x: string) => x === "",
+    mov: (x: string) => this.checkMov(x),
+    cmp: (x: string) => x.match(COMPARE) !== null,
+    jmp: (x: string) => x.match(JUMP) !== null,
+    jmpr: (x: string) => x.match(JUMP) !== null,
+    opp: () => true,
+    load: (x: string) => this.checkLoad(x),
+    save: (x: string) => this.checkSave(x),
+    in: (x: string) => x.match(REGISTER) !== null,
+    out: (x: string) => x.match(OUT_PATTERN) !== null,
+    halt: (x: string) => x === "",
   } as const;
 
   // Get translation stage two instructions (those with {label} or {number})
-  private translationKeys = Object.keys(CU_FLAGS);
-  private translationStageTwo = this.translationKeys.filter(key => 
-    key.includes('{label}') || key.includes('{number}')
+  private readonly translationKeys = Object.keys(CU_FLAGS);
+  private readonly translationStageTwo = this.translationKeys.filter(
+    key => key.includes("{label}") || key.includes("{number}")
   );
 
   private matchLabelInstruction(line: string, instruction: string): HexOrLabel[] | null {
     const escapedInstruction = this.escapeRegExp(instruction);
     const matchWholeIns = `^${escapedInstruction.replace(/\\{label\\}/, "([^ ]+)")}$`;
     const match = line.match(new RegExp(matchWholeIns));
-    
+
     if (match) {
       return [
         { kind: HexOrLabelKind.HEX, hex: CU_FLAGS[instruction] },
@@ -94,16 +94,20 @@ export class Assembler {
     const escapedInstruction = this.escapeRegExp(instruction);
     const matchWholeIns = `^${escapedInstruction.replace(/\\{number\\}/, NUMBER.source)}$`;
     const match = line.match(new RegExp(matchWholeIns));
-    
+
     if (match) {
       let num: number;
-      if (match[2]) { // hex
+      if (match[2]) {
+        // hex
         num = parseInt(match[2], 16);
-      } else if (match[3]) { // binary
+      } else if (match[3]) {
+        // binary
         num = parseInt(match[3].substring(2), 2);
-      } else if (match[4]) { // octal
+      } else if (match[4]) {
+        // octal
         num = parseInt(match[4].substring(2), 8);
-      } else { // decimal
+      } else {
+        // decimal
         num = parseInt(match[5]);
       }
 
@@ -127,15 +131,15 @@ export class Assembler {
 
     for (const instruction of this.translationStageTwo) {
       let result: HexOrLabel[] | null;
-      
-      if (instruction.includes('{label}')) {
+
+      if (instruction.includes("{label}")) {
         result = this.matchLabelInstruction(line, instruction);
       } else {
         result = this.matchNumberInstruction(line, instruction);
       }
 
       if (result) {
-        offset.value += instruction.includes('{label}') ? 3 : 2;
+        offset.value += instruction.includes("{label}") ? 3 : 2;
         return result;
       }
     }
@@ -155,10 +159,10 @@ export class Assembler {
     return false;
   }
 
-  private translateInstructions(line: string): void {
-    const variables = line.split(' ');
+  private translateInstructions(line: string) {
+    const variables = line.split(" ");
     const opp = variables[0];
-    const oppArgs = variables.slice(1).join(' ');
+    const oppArgs = variables.slice(1).join(" ");
 
     if (opp in this.operations) {
       if (!this.operations[opp](oppArgs)) {
@@ -182,14 +186,14 @@ export class Assembler {
    */
   public assemble(lines: string[]): HexOrLabel[] {
     if (!Array.isArray(lines)) {
-      throw new AssemblerError('Input must be an array of strings');
+      throw new AssemblerError("Input must be an array of strings");
     }
     this.final = [];
     this.labels.clear();
     this.offset.value = 0;
 
     for (let line of lines) {
-      line = line.replace(/\/\/.*/, '').trim();
+      line = line.replace(/\/\/.*/, "").trim();
       if (line.length === 0) continue;
 
       if (this.handleLabels(line, this.labels, this.offset.value)) {
@@ -204,7 +208,7 @@ export class Assembler {
 
   public hexOutput(final: HexOrLabel[]): number[] {
     const fileOutput: number[] = [];
-    
+
     for (const ins of final) {
       if (ins.kind === HexOrLabelKind.LABEL) {
         const labelHex = this.labels.get(ins.label);
@@ -212,7 +216,7 @@ export class Assembler {
           throw new AssemblerError(`Undefined label: ${ins.label}`);
         }
         fileOutput.push(labelHex >> 8);
-        fileOutput.push(labelHex & 0xFF);
+        fileOutput.push(labelHex & 0xff);
       } else {
         fileOutput.push(ins.hex);
       }
@@ -225,7 +229,7 @@ export class Assembler {
     return Number.isInteger(hex) && hex >= 0 && hex <= 0xff;
   }
 
-  private escapeRegExp(string: string) {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+  private escapeRegExp(string: string): string {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // $& means the whole matched string
   }
-} 
+}

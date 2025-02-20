@@ -1,23 +1,40 @@
-import { Token, TokenObj } from './tokens';
+import { Token, TokenObj } from "./tokens";
 import {
-  Expr, Binary, Grouping, Unary, LiteralBool,
-  LiteralString, LiteralNumber, Variable, Assign, Logical, Call,
-  Input
-} from '../ast/expressions';
+  Expr,
+  Binary,
+  Grouping,
+  Unary,
+  LiteralBool,
+  LiteralString,
+  LiteralNumber,
+  Variable,
+  Assign,
+  Logical,
+  Call,
+  Input,
+} from "../ast/expressions";
 import {
-  Stmt, Expression, If, While, For, Block, Var, Function, Return, Output,
-} from '../ast/statements';
-import { ASTPrinter } from '../ast/printer';
+  Stmt,
+  Expression,
+  If,
+  While,
+  For,
+  Block,
+  Var,
+  Function,
+  Return,
+  Output,
+} from "../ast/statements";
 
 export class ParserError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'ParserError';
+    this.name = "ParserError";
   }
 }
 
 export class Parser {
-  private tokens: TokenObj[];
+  private readonly tokens: TokenObj[];
   private current = 0;
 
   constructor(tokens: TokenObj[]) {
@@ -167,13 +184,13 @@ export class Parser {
     }
     this.consume(Token.RIGHT_PAREN, "Expect ')' after for clauses.");
 
-    let body = this.statement();
+    const body = this.statement();
 
     return new For(initializer, condition, increment, body);
   }
 
   private returnStatement(): Stmt {
-    const keyword = this.previous();
+    // const keyword = this.previous();
     let value = null;
     if (!this.check(Token.SEMICOLON) && !this.check(Token.RIGHT_BRACE)) {
       value = this.expression();
@@ -369,7 +386,7 @@ export class Parser {
     }
 
     if (this.match(Token.IN)) {
-      return new Input()
+      return new Input();
     }
 
     if (this.match(Token.IDENTIFIER)) {

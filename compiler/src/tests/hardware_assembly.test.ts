@@ -1,9 +1,9 @@
-import path from 'path';
-import fs from 'fs';
-import { HardwareVM } from '../vm/hardware_vm';
-import { Assembler } from '../core/assembler';
+import path from "path";
+import fs from "fs";
+import { HardwareVM } from "../vm/hardware_vm";
+import { Assembler } from "../core/assembler";
 
-const assemblyDir = path.join(__dirname, '../../../example_programs/assembly');
+const assemblyDir = path.join(__dirname, "../../../example_programs/assembly");
 
 interface ExpectedState {
   maxSteps: number;
@@ -13,34 +13,34 @@ interface ExpectedState {
 }
 
 function parseExpectedFile(content: string): ExpectedState {
-  const lines = content.trim().split('\n');
+  const lines = content.trim().split("\n");
   const result: ExpectedState = {
     maxSteps: 500,
     inputs: [],
     outputs: [],
-    memory: new Map()
+    memory: new Map(),
   };
 
   for (const line of lines) {
-    const [key, value] = line.split(': ').map(s => s.trim());
+    const [key, value] = line.split(": ").map(s => s.trim());
     switch (key) {
-      case 's':
+      case "s":
         result.maxSteps = parseInt(value);
         break;
-      case 'i':
+      case "i":
         if (value) {
-          result.inputs = value.split(',').map(v => parseInt(v));
+          result.inputs = value.split(",").map(v => parseInt(v));
         }
         break;
-      case 'o':
+      case "o":
         if (value) {
-          result.outputs = value.split(',').map(v => parseInt(v));
+          result.outputs = value.split(",").map(v => parseInt(v));
         }
         break;
-      case 'r':
+      case "r":
         if (value) {
-          value.split(',').forEach(pair => {
-            const [addr, val] = pair.split(':').map(v => parseInt(v));
+          value.split(",").forEach(pair => {
+            const [addr, val] = pair.split(":").map(v => parseInt(v));
             result.memory.set(addr, val);
           });
         }
@@ -50,29 +50,29 @@ function parseExpectedFile(content: string): ExpectedState {
   return result;
 }
 
-describe('Assembly Program Validation', () => {
-  const testFiles = fs.readdirSync(assemblyDir)
-    .filter(f => f.endsWith('.e'))
+describe("Assembly Program Validation", () => {
+  const testFiles = fs
+    .readdirSync(assemblyDir)
+    .filter(f => f.endsWith(".e"))
     .map(f => ({
-      name: f,
       expectedPath: path.join(assemblyDir, f),
-      assemblyPath: path.join(assemblyDir, f.replace('.e', '.j'))
+      assemblyPath: path.join(assemblyDir, f.replace(".e", ".j")),
     }));
 
-  test.each(testFiles)('$name validates program execution', ({ name, assemblyPath, expectedPath }) => {
+  test.each(testFiles)("$name validates program execution", ({ assemblyPath, expectedPath }) => {
     // Read and parse files
-    const assemblyCode = fs.readFileSync(assemblyPath, 'utf-8');
-    const expectedState = parseExpectedFile(fs.readFileSync(expectedPath, 'utf-8'));
-    
+    const assemblyCode = fs.readFileSync(assemblyPath, "utf-8");
+    const expectedState = parseExpectedFile(fs.readFileSync(expectedPath, "utf-8"));
+
     // Assemble and execute
     const assembler = new Assembler();
-    const program = assembler.assemble(assemblyCode.trim().split('\n'));
+    const program = assembler.assemble(assemblyCode.trim().split("\n"));
     const bytecode = assembler.hexOutput(program);
     expect(bytecode.length).toBeGreaterThan(0);
 
     const vm = new HardwareVM();
     const actualOutputs: number[] = [];
-    
+
     vm.setOutputCallback(value => {
       actualOutputs.push(value);
     });
@@ -81,13 +81,12 @@ describe('Assembly Program Validation', () => {
     let inputIndex = 0;
     if (expectedState.inputs.length > 0) {
       vm.setInputCallback(() => {
-        return inputIndex < expectedState.inputs.length ? 
-          expectedState.inputs[inputIndex++] : 0;
+        return inputIndex < expectedState.inputs.length ? expectedState.inputs[inputIndex++] : 0;
       });
     }
 
     vm.loadProgram(bytecode);
-    
+
     let stepCount = 0;
     const maxSteps = expectedState.maxSteps < 0 ? 5000 : expectedState.maxSteps;
     // stepCount must stay strictly less than maxSteps

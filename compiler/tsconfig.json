@@ -1,17 +1,14 @@
 {
-    "compilerOptions": {
-      "target": "esnext",
-      "module": "esnext",
-      "strict": true,
-      "esModuleInterop": true,
-      "inlineSourceMap": true,
-      "skipLibCheck": true,
-      "forceConsistentCasingInFileNames": true,
-      "outDir": "./dist",
-      "rootDir": ".",
-    },
-    "include": [
-      "src/**/*",
-      "*.ts"
-    ]
-  }
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "strict": true,
+    "esModuleInterop": true,
+    "inlineSourceMap": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "outDir": "./dist",
+    "rootDir": "."
+  },
+  "include": ["src/**/*", "*.ts"]
+}

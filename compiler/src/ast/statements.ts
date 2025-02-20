@@ -1,4 +1,4 @@
-import { Expr } from './expressions';
+import { Expr } from "./expressions";
 
 export interface StmtVisitor<T> {
   visitExpressionStmt(stmt: Expression): T;
@@ -123,4 +123,4 @@ export class Output extends Stmt {
   accept<T>(visitor: StmtVisitor<T>): T {
     return visitor.visitOutputStmt(this);
   }
-} 
+}

@@ -11,7 +11,7 @@ export const HALT_RANGE = { MIN: 0xff, MAX: 0xff };
 
 // Instruction lookup table
 export const CU_FLAGS: Record<string, number> = {
-  "nop": 0x00,
+  nop: 0x00,
   "mov a b": 0x01,
   "mov a c": 0x02,
   "mov a d": 0x03,
@@ -252,5 +252,5 @@ export const CU_FLAGS: Record<string, number> = {
   "out ram[b]": 0xfb,
   "out ram[c]": 0xfc,
   "out ram[d]": 0xfd,
-  "halt": 0xff
+  halt: 0xff,
 };

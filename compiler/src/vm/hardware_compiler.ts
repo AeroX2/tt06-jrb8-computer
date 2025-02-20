@@ -1,36 +1,56 @@
-import { 
-  Expr, ExprVisitor, Binary, Grouping, Unary, LiteralBool,
-  LiteralString, LiteralNumber, Variable, Assign, Logical, Call,
-  Input
-} from '../ast/expressions';
 import {
-  Stmt, StmtVisitor, Expression, If, While, For,
-  Block, Var, Function, Return, Output
-} from '../ast/statements';
-import { Token } from '../core/tokens';
-import { Assembler } from '../core/assembler';
+  Expr,
+  ExprVisitor,
+  Binary,
+  Grouping,
+  Unary,
+  LiteralBool,
+  LiteralString,
+  LiteralNumber,
+  Variable,
+  Assign,
+  Logical,
+  Call,
+  Input,
+} from "../ast/expressions";
+import {
+  Stmt,
+  StmtVisitor,
+  Expression,
+  If,
+  While,
+  For,
+  Block,
+  Var,
+  Function,
+  Return,
+  Output,
+} from "../ast/statements";
+import { Token } from "../core/tokens";
+import { Assembler } from "../core/assembler";
 
 export class CompileError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'CompileError';
+    this.name = "CompileError";
   }
 }
 
 export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<string[]> {
-  private variables: Map<string, number> = new Map();
+  private readonly variables: Map<string, number> = new Map();
   private nextVarAddress: number = 0;
   private labelCounter: number = 0;
 
   // Group related operators into constants for better maintainability
   private static readonly COMPARISON_OPERATORS = new Set([
-    Token.GREATER, Token.GREATER_EQUAL, Token.LESS,
-    Token.LESS_EQUAL, Token.EQUAL_EQUAL
+    Token.GREATER,
+    Token.GREATER_EQUAL,
+    Token.LESS,
+    Token.LESS_EQUAL,
+    Token.EQUAL_EQUAL,
   ]);
 
-  private static readonly RIGHT_EVAL_FIRST_OPERATORS = new Set([
-    Token.MINUS, Token.SLASH
-  ]);
+  private static readonly RIGHT_EVAL_FIRST_OPERATORS = new Set([Token.MINUS, Token.SLASH]);
 
   compileToAssembly(statements: Stmt[]): string[] {
     this.variables.clear();
@@ -42,7 +62,7 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
     for (const stmt of statements) {
       assemblyLines.push(...stmt.accept(this));
     }
-    assemblyLines.push('halt');
+    assemblyLines.push("halt");
     return assemblyLines;
   }
 
@@ -53,9 +73,9 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
     // Convert to final numeric bytecode with resolved labels
     const resolvedBytecode = assembler.hexOutput(bytecode);
     if (resolvedBytecode.length === 0) {
-      throw new CompileError('Failed to resolve all labels in the bytecode');
+      throw new CompileError("Failed to resolve all labels in the bytecode");
     }
-    
+
     return resolvedBytecode;
   }
 
@@ -81,65 +101,57 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
     const result: string[] = [];
     result.push(
       ...expr.left.accept(this),
-      'mov a b',
+      "mov a b",
       ...expr.right.accept(this),
-      'mov a c',
-      'opp 0',
-      'cmp b c'
+      "mov a c",
+      "opp 0",
+      "cmp b c"
     );
-    
+
     const skipLabel = this.createLabel();
-    
+
     const jumpMap: Partial<Record<Token, string>> = {
-      [Token.GREATER]: '<=',
-      [Token.GREATER_EQUAL]: '<',
-      [Token.LESS]: '>=',
-      [Token.LESS_EQUAL]: '>',
-      [Token.EQUAL_EQUAL]: '!='
+      [Token.GREATER]: "<=",
+      [Token.GREATER_EQUAL]: "<",
+      [Token.LESS]: ">=",
+      [Token.LESS_EQUAL]: ">",
+      [Token.EQUAL_EQUAL]: "!=",
     };
-    
+
     result.push(`jmp ${jumpMap[expr.op]} ${skipLabel}`);
-    result.push('opp 1');
+    result.push("opp 1");
     result.push(`:${skipLabel}`);
     return result;
   }
 
   private handleRightFirst(expr: Binary): string[] {
     const result: string[] = [];
-    result.push(
-      ...expr.right.accept(this),
-      'mov a b',
-      ...expr.left.accept(this)
-    );
-    
+    result.push(...expr.right.accept(this), "mov a b", ...expr.left.accept(this));
+
     const opMap: Partial<Record<Token, string>> = {
-      [Token.MINUS]: 'a-b',
-      [Token.SLASH]: 'a/b'
+      [Token.MINUS]: "a-b",
+      [Token.SLASH]: "a/b",
     };
-    
+
     result.push(`opp ${opMap[expr.op]}`);
     return result;
   }
 
   private handleLeftFirst(expr: Binary): string[] {
     const result: string[] = [];
-    result.push(
-      ...expr.left.accept(this),
-      'mov a b',
-      ...expr.right.accept(this)
-    );
-    
+    result.push(...expr.left.accept(this), "mov a b", ...expr.right.accept(this));
+
     const opMap: Partial<Record<Token, string>> = {
-      [Token.PLUS]: 'a+b',
-      [Token.STAR]: 'a*b',
-      [Token.AND]: 'a&b',
-      [Token.OR]: 'a|b'
+      [Token.PLUS]: "a+b",
+      [Token.STAR]: "a*b",
+      [Token.AND]: "a&b",
+      [Token.OR]: "a|b",
     };
-    
-    if (!opMap[expr.op]) {
+
+    if (opMap[expr.op] === undefined) {
       throw new CompileError(`Unknown binary operator: ${expr.op}`);
     }
-    
+
     result.push(`opp ${opMap[expr.op]}`);
     return result;
   }
@@ -150,24 +162,25 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
 
   visitUnary(expr: Unary): string[] {
     const result = expr.right.accept(this);
-    
+
     switch (expr.op) {
       case Token.MINUS:
-        result.push('opp -a');
+        result.push("opp -a");
         break;
       case Token.TILDE:
-        result.push('opp ~a');
-        break
-      case Token.BANG:
+        result.push("opp ~a");
+        break;
+      case Token.BANG: {
         const skipLabel = this.createLabel();
-        result.push('cmp a 0');
-        result.push('opp 0');
+        result.push("cmp a 0");
+        result.push("opp 0");
         result.push(`jmp != ${skipLabel}`);
-        result.push('opp 1');
+        result.push("opp 1");
         result.push(`:${skipLabel}`);
         break;
+      }
     }
-    
+
     return result;
   }
 
@@ -175,7 +188,7 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
     return [`opp ${expr.val ? 1 : 0}`];
   }
 
-  visitLiteralString(expr: LiteralString): string[] {
+  visitLiteralString(_expr: LiteralString): string[] {
     throw new CompileError("String literals not supported in hardware implementation");
   }
 
@@ -184,21 +197,21 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
       throw new CompileError("Number out of range (0-255)");
     }
     if (expr.val === 0) {
-      return ['opp 0'];
+      return ["opp 0"];
     } else if (expr.val === 1) {
-      return ['opp 1'];
+      return ["opp 1"];
     } else if (expr.val === -1) {
-      return ['opp -1'];
+      return ["opp -1"];
     }
     return [`load rom a ${expr.val}`];
   }
 
-  visitInput(expr: Input): string[] {
-    return [`in a`]
+  visitInput(_expr: Input): string[] {
+    return [`in a`];
   }
 
   visitVariable(expr: Variable): string[] {
-    const address = this.variables.get(expr.name.value || '');
+    const address = this.variables.get(expr.name.value ?? "");
     if (address === undefined) {
       throw new CompileError(`Undefined variable: ${expr.name.value}`);
     }
@@ -207,7 +220,7 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
 
   visitAssign(expr: Assign): string[] {
     const result = expr.value.accept(this);
-    const address = this.variables.get(expr.name.value || '');
+    const address = this.variables.get(expr.name.value ?? "");
     if (address === undefined) {
       throw new CompileError(`Undefined variable: ${expr.name.value}`);
     }
@@ -220,27 +233,18 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
     const result = expr.left.accept(this);
 
     if (expr.op === Token.AND_AND) {
-      result.push(
-        'cmp a 0',
-        `jmp = ${endLabel}`
-      );
+      result.push("cmp a 0", `jmp = ${endLabel}`);
     } else if (expr.op === Token.OR_OR) {
-      result.push(
-        'cmp a 0',
-        `jmp != ${endLabel}`
-      );
+      result.push("cmp a 0", `jmp != ${endLabel}`);
     } else {
       throw new CompileError(`Unknown logical operator: ${expr.op}`);
     }
 
-    result.push(
-      ...expr.right.accept(this),
-      `:${endLabel}`
-    );
+    result.push(...expr.right.accept(this), `:${endLabel}`);
     return result;
   }
 
-  visitCall(expr: Call): string[] {
+  visitCall(_expr: Call): string[] {
     throw new CompileError("Function calls not yet implemented for hardware");
   }
 
@@ -253,10 +257,7 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
     const elseLabel = this.createLabel();
     const endLabel = this.createLabel();
 
-    result.push(
-      'cmp a 0',
-      `jmp = ${elseLabel}`
-    );
+    result.push("cmp a 0", `jmp = ${elseLabel}`);
 
     result.push(...stmt.thenBranch.accept(this));
     result.push(`jmp ${endLabel}`);
@@ -279,27 +280,20 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
     const startLabel = this.createLabel();
     const endLabel = this.createLabel();
     const result: string[] = [];
-    
+
     result.push(`:${startLabel}`);
-    
+
     if (condition) {
-      result.push(
-        ...condition.accept(this),
-        'cmp a 0',
-        `jmp = ${endLabel}`
-      );
+      result.push(...condition.accept(this), "cmp a 0", `jmp = ${endLabel}`);
     }
 
     result.push(...body.accept(this));
-    
+
     if (increment) {
       result.push(...increment.accept(this));
     }
 
-    result.push(
-      `jmp ${startLabel}`,
-      `:${endLabel}`
-    );
+    result.push(`jmp ${startLabel}`, `:${endLabel}`);
     return result;
   }
 
@@ -312,11 +306,7 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
     if (stmt.initializer) {
       result.push(...stmt.initializer.accept(this));
     }
-    result.push(...this.compileLoopBody(
-      stmt.condition,
-      stmt.body,
-      stmt.increment
-    ));
+    result.push(...this.compileLoopBody(stmt.condition, stmt.body, stmt.increment));
     return result;
   }
 
@@ -335,26 +325,23 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
     this.variables.set(varName, address);
 
     if (stmt.initializer) {
-      result.push(
-        ...stmt.initializer.accept(this),
-        `save a ram[${address}]`
-      );
+      result.push(...stmt.initializer.accept(this), `save a ram[${address}]`);
     }
 
     return result;
   }
 
-  visitFunctionStmt(stmt: Function): string[] {
+  visitFunctionStmt(_stmt: Function): string[] {
     throw new CompileError("Functions not yet implemented for hardware");
   }
 
-  visitReturnStmt(stmt: Return): string[] {
+  visitReturnStmt(_stmt: Return): string[] {
     throw new CompileError("Return not yet implemented for hardware");
   }
 
   visitOutputStmt(stmt: Output): string[] {
     const result = stmt.expression.accept(this);
-    result.push('out a');
+    result.push("out a");
     return result;
   }
-} 
+}

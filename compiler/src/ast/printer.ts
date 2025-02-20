@@ -1,12 +1,19 @@
-import { ExprVisitor, Input } from './expressions';
-import { StmtVisitor } from './statements';
+import { ExprVisitor, Input } from "./expressions";
+import { StmtVisitor } from "./statements";
 import {
-  Expr, Binary, Grouping, Unary, LiteralBool,
-  LiteralString, LiteralNumber, Variable, Assign, Logical, Call
-} from './expressions';
-import {
-  Stmt, Expression, If, While, For, Block, Var, Function, Return, Output
-} from './statements';
+  Expr,
+  Binary,
+  Grouping,
+  Unary,
+  LiteralBool,
+  LiteralString,
+  LiteralNumber,
+  Variable,
+  Assign,
+  Logical,
+  Call,
+} from "./expressions";
+import { Expression, If, While, For, Block, Var, Function, Return, Output } from "./statements";
 
 export class ASTPrinter implements ExprVisitor<string>, StmtVisitor<string> {
   visit(expr: Expr): string {
@@ -38,7 +45,7 @@ export class ASTPrinter implements ExprVisitor<string>, StmtVisitor<string> {
   }
 
   visitVariable(expr: Variable): string {
-    return expr.name.value || '';
+    return expr.name.value ?? "";
   }
 
   visitAssign(expr: Assign): string {
@@ -49,12 +56,12 @@ export class ASTPrinter implements ExprVisitor<string>, StmtVisitor<string> {
     return `[${expr.left.accept(this)} ${expr.op} ${expr.right.accept(this)}]`;
   }
 
-  visitInput(expr: Input): string {
-    return `in`
+  visitInput(_expr: Input): string {
+    return `in`;
   }
 
   visitCall(expr: Call): string {
-    const args = expr.args.map(arg => arg.accept(this)).join(', ');
+    const args = expr.args.map(arg => arg.accept(this)).join(", ");
     return `${expr.callee.accept(this)}(${args})`;
   }
 
@@ -75,33 +82,33 @@ export class ASTPrinter implements ExprVisitor<string>, StmtVisitor<string> {
   }
 
   visitForStmt(stmt: For): string {
-    let init = stmt.initializer ? stmt.initializer.accept(this) : '';
-    let cond = stmt.condition ? stmt.condition.accept(this) : '';
-    let inc = stmt.increment ? stmt.increment.accept(this) : '';
+    const init = stmt.initializer ? stmt.initializer.accept(this) : "";
+    const cond = stmt.condition ? stmt.condition.accept(this) : "";
+    const inc = stmt.increment ? stmt.increment.accept(this) : "";
     return `for (${init} ${cond} ${inc}) {\n  ${stmt.body.accept(this)}\n}`;
   }
 
   visitBlockStmt(stmt: Block): string {
-    return stmt.statements.map(s => s.accept(this)).join('\n  ');
+    return stmt.statements.map(s => s.accept(this)).join("\n  ");
   }
 
   visitVarStmt(stmt: Var): string {
-    let init = stmt.initializer ? ` = ${stmt.initializer.accept(this)}` : '';
+    const init = stmt.initializer ? ` = ${stmt.initializer.accept(this)}` : "";
     return `var ${stmt.name}${init}`;
   }
 
   visitFunctionStmt(stmt: Function): string {
-    const params = stmt.params.join(', ');
-    const body = stmt.body.map(s => s.accept(this)).join('\n  ');
+    const params = stmt.params.join(", ");
+    const body = stmt.body.map(s => s.accept(this)).join("\n  ");
     return `fun ${stmt.name}(${params}) {\n  ${body}\n}`;
   }
 
   visitReturnStmt(stmt: Return): string {
-    let value = stmt.value ? ` ${stmt.value.accept(this)}` : '';
+    const value = stmt.value ? ` ${stmt.value.accept(this)}` : "";
     return `return${value}`;
   }
 
   visitOutputStmt(stmt: Output): string {
     return `out ${stmt.expression.accept(this)}`;
   }
-} 
+}

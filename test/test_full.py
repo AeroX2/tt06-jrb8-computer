@@ -52,7 +52,7 @@ async def wait_for_sclk(sclk, v):
         await Timer(5, "us")
 
 
-async def send_data(computer, sclk, ROM, address_24bit, cs_ram, get_input):
+async def send_data(computer, sclk, ROM, address_24bit, cs_ram):
     read_or_write = 0
     for i in range(8):
         await wait_for_sclk(sclk, 1)
@@ -78,12 +78,12 @@ async def send_data(computer, sclk, ROM, address_24bit, cs_ram, get_input):
                 await wait_for_sclk(sclk, 0)
             await wait_for_sclk(sclk, 0)
 
-            print("Written data is", data, "at", address)
+            # print("Written data is", data, "at", address)
             RAM[address] = data
         else:
             # Read
             data = RAM[address]
-            print("Read data is", data)
+            # print("Read data is", data)
             for i in range(8):
                 await wait_for_sclk(sclk, 0)
                 computer.uio_in[2].value = (data >> (7 - i)) & 1
@@ -93,10 +93,7 @@ async def send_data(computer, sclk, ROM, address_24bit, cs_ram, get_input):
     else:
         assert bin(read_or_write) == bin(0x03)
         data = ROM[address]
-        if (data >= 0xf0):
-            computer.ui_in.value = get_input()
-
-        print("Reading ROM from", address, "which is", data)
+        # print("Reading ROM from", address, "which is", data)
 
         for i in range(8):
             await wait_for_sclk(sclk, 0)
@@ -105,48 +102,6 @@ async def send_data(computer, sclk, ROM, address_24bit, cs_ram, get_input):
         await wait_for_sclk(sclk, 0)
         computer.uio_in[2].value = 0
 
-
-# async def send_ram_data(computer, sclk, address_24bit):
-#     read_or_write = 0
-#     for i in range(8):
-#         await wait_for_sclk(sclk, 1)
-#         read_or_write |= computer.uio_out[1].value.integer << (7 - i)
-#         await wait_for_sclk(sclk, 0)
-#     assert bin(read_or_write) == bin(0x2) or bin(read_or_write) == bin(0x3)
-
-#     mar = 0
-#     v = 24 if address_24bit else 16
-#     for i in range(v):
-#         await wait_for_sclk(sclk, 1)
-#         mar |= computer.uio_out[1].value.integer << (v - 1 - i)
-#         await wait_for_sclk(sclk, 0)
-
-#     # In 24bit addressing mode, the RAM is placed at 0x10000
-#     # so just minus it off to keeps the offsets the same.
-#     if (address_24bit):
-#         mar -= 0x10000
-
-#     if read_or_write == 0x2:
-#         # Write
-#         data = 0
-#         for i in range(8):
-#             await wait_for_sclk(sclk, 1)
-#             data |= computer.uio_out[1].value.integer << (7 - i)
-#             await wait_for_sclk(sclk, 0)
-#         await wait_for_sclk(sclk, 0)
-
-#         print("Written data is", data, "at", mar)
-#         RAM[mar] = data
-#     else:
-#         # Read
-#         data = RAM[mar]
-#         print("Read data is", data)
-#         for i in range(8):
-#             await wait_for_sclk(sclk, 0)
-#             computer.uio_in[2].value = (data >> (7 - i)) & 1
-#             await wait_for_sclk(sclk, 1)
-#         await wait_for_sclk(sclk, 0)
-#         computer.uio_in[2].value = 0
 
 async def run(dut, ROM, cycles, address_24bit = False, inputs = []):
     computer, clk, sclk = await setup(dut)
@@ -157,13 +112,8 @@ async def run(dut, ROM, cycles, address_24bit = False, inputs = []):
     computer.uio_in[7].value = address_24bit
 
     outputs = []
-    previous_output = None
-
     current_input = -1
-    def get_input():
-        nonlocal current_input
-        current_input += 1    
-        return inputs[current_input] if (0 <= current_input and current_input < len(inputs)) else 0
+    previous_output = None
 
     for cycle in range(cycles):
         await ClockCycles(clk, 1)
@@ -171,6 +121,10 @@ async def run(dut, ROM, cycles, address_24bit = False, inputs = []):
         current_output = computer.uo_out.value
         if current_output != previous_output:
             outputs.append(current_output)
+            if (len(inputs) > 0):
+                if current_input + 1 < len(inputs):
+                    current_input += 1
+                computer.ui_in.value = inputs[current_input]
         previous_output = current_output
 
         try:
@@ -185,7 +139,6 @@ async def run(dut, ROM, cycles, address_24bit = False, inputs = []):
                     ROM,
                     address_24bit,
                     cs_ram and not address_24bit,
-                    get_input,
                 )
         except Exception as e:
             print(e)
@@ -220,6 +173,7 @@ async def test_add_example(dut):
     outputs = await load_and_run(dut, "../example_programs/assembly/add_program.o", 200, True)
     assert outputs[1] == 34
 
+
 @cocotb.test()
 async def test_output_example(dut):
     outputs = await load_and_run(dut, "../example_programs/assembly/output.o", 200)
@@ -232,14 +186,15 @@ async def test_output_example(dut):
     assert outputs[2] == 37
     assert outputs[3] == 74
 
+
 @cocotb.test()
 async def test_input_example(dut):
-    outputs = await load_and_run(dut, "../example_programs/assembly/input_program.o", 200, False, [41,42,43])
+    outputs = await load_and_run(dut, "../example_programs/assembly/input_program.o", 500, False, [41,42,43])
     assert outputs[1] == -1 & 0xFF
     assert outputs[2] == 0
     assert outputs[3] == 1
 
-    outputs = await load_and_run(dut, "../example_programs/assembly/input_program.o", 200, True, [41,42,43])
+    outputs = await load_and_run(dut, "../example_programs/assembly/input_program.o", 500, True, [41,42,43])
     assert outputs[1] == -1 & 0xFF
     assert outputs[2] == 0
     assert outputs[3] == 1
@@ -360,24 +315,7 @@ async def test_primes_example(dut):
     assert len(outputs) > 2
     for output in outputs[2:]:
         assert is_prime(output.integer)
-
-
-# # @cocotb.test()
-# # async def test_all(dut):
-# #     programs = glob.glob('../example_programs/assembly/*.e')
-# #     for program in programs:
-# #         print("Running program: ", program)
-# #         path = Path(program)
-
-# #         with open(path, "r") as f:
-# #             expected_d = f.readlines()
-# #         expected_steps = int(expected_d[0][2:])
-# #         expected_output = list(map(int, expected_d[2][3:].strip().split(",")))
-# #         expected_ram = string_to_dict(expected_d[3][3:].strip())
-
-# #         outputs = await load_and_run(dut, path.with_suffix(".o"), expected_steps)
-
-# #         for k,v in expected_ram.items():
-# #             assert RAM[k] == v
-# #         outputs = [x.integer for x in outputs]
-# #         assert outputs[1:] == expected_output
+    outputs = await load_and_run(dut, "../example_programs/assembly/primes.o", 5000, True)
+    assert len(outputs) > 2
+    for output in outputs[2:]:
+        assert is_prime(output.integer)

@@ -35,17 +35,17 @@ jobs:
       - name: GL test
         uses: TinyTapeout/tt-gds-action/gl_test@tt06
 
-  viewer:
-    needs: gds
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write      # to deploy to Pages
-      id-token: write   # to verify the deployment originates from an appropriate source
-    steps:
-      - uses: TinyTapeout/tt-gds-action/viewer@tt06
+  # TODO: Replace this with a copy since deploy is now handling GH pages
+  # viewer:
+  #   needs: gds
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     pages: write      # to deploy to Pages
+  #     id-token: write   # to verify the deployment originates from an appropriate source
+  #   steps:
+  #     - uses: TinyTapeout/tt-gds-action/viewer@tt06
 
   deploy:
-    needs: viewer
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3

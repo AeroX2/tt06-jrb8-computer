@@ -1,0 +1,167 @@
+// ============================================================
+//  SSD1306 OLED "draw some pixels" demo - JRP version
+// ============================================================
+//
+//  Same behaviour as example_programs/assembly/ssd1306_pixels.j, but
+//  written in the high-level JRP language.
+//
+//  Bit-banged I2C on the output register:
+//     SDA (data)  = uo[0]   (output bit 0)
+//     SCL (clock) = uo[1]   (output bit 1)
+//     out value   = (SCL << 1) | SDA
+//        0b00 SDA=0 SCL=0    0b01 SDA=1 SCL=0
+//        0b10 SDA=0 SCL=1    0b11 SDA=1 SCL=1
+//
+//  I2C address 0x78 = 0x3C write. (Use 0x7A if your panel is 0x3D.)
+//
+//  JRP has no functions or arrays, so the "send a byte" routine is
+//  inlined where needed, and the command table is an if-chain that
+//  selects the byte for the current index.
+// ============================================================
+
+var v = 0      // byte currently being sent
+var mask = 0   // walks 0x80 -> 0x01 to pick each bit, MSB first
+var i = 0      // command index
+var h = 0      // data-transaction header index (address + control)
+var page = 0   // data page counter  (8 pages of 128 columns = 1024 bytes)
+var col = 0    // data column counter
+
+// ==================== command transaction ====================
+
+// I2C START
+out 0b11
+out 0b10
+out 0b00
+
+// Send the 33 setup bytes: I2C address, command control byte, init
+// sequence, and the column/page window.
+i = 0
+while (i < 33) {
+  if (i == 0)  v = 0x78    // I2C write address (0x3C << 1)
+  if (i == 1)  v = 0x00    // control byte: command stream
+  if (i == 2)  v = 0xAE    // display OFF
+  if (i == 3)  v = 0xD5    // set display clock divide
+  if (i == 4)  v = 0x80    //   ratio / oscillator
+  if (i == 5)  v = 0xA8    // set multiplex ratio
+  if (i == 6)  v = 0x3F    //   63 (128x64)
+  if (i == 7)  v = 0xD3    // set display offset
+  if (i == 8)  v = 0x00    //   0
+  if (i == 9)  v = 0x40    // set start line 0
+  if (i == 10) v = 0x8D    // charge pump
+  if (i == 11) v = 0x14    //   enable
+  if (i == 12) v = 0x20    // memory addressing mode
+  if (i == 13) v = 0x00    //   horizontal
+  if (i == 14) v = 0xA1    // segment remap
+  if (i == 15) v = 0xC8    // COM scan direction remapped
+  if (i == 16) v = 0xDA    // COM pins config
+  if (i == 17) v = 0x12    //   alternative
+  if (i == 18) v = 0x81    // contrast
+  if (i == 19) v = 0xCF    //   value
+  if (i == 20) v = 0xD9    // pre-charge period
+  if (i == 21) v = 0xF1    //   value
+  if (i == 22) v = 0xDB    // VCOMH deselect
+  if (i == 23) v = 0x40    //   value
+  if (i == 24) v = 0xA4    // resume to RAM content
+  if (i == 25) v = 0xA6    // normal (non-inverted)
+  if (i == 26) v = 0x21    // set column address range
+  if (i == 27) v = 0x00    //   start col 0
+  if (i == 28) v = 0x7F    //   end col 127
+  if (i == 29) v = 0x22    // set page address range
+  if (i == 30) v = 0x00    //   start page 0
+  if (i == 31) v = 0x07    //   end page 7
+  if (i == 32) v = 0xAF    // display ON
+
+  // --- send v over I2C, MSB first ---
+  mask = 0b10000000
+  while (mask > 0) {
+    if (v & mask) {
+      out 0b01           // SDA=1 SCL=0
+      out 0b11           // SDA=1 SCL=1  (clock rising edge)
+      out 0b01           // SDA=1 SCL=0
+    } else {
+      out 0b00           // SDA=0 SCL=0
+      out 0b10           // SDA=0 SCL=1  (clock rising edge)
+      out 0b00           // SDA=0 SCL=0
+    }
+    mask = mask / 2
+  }
+  // 9th clock: ACK (SDA released high, bit ignored)
+  out 0b01
+  out 0b11
+  out 0b01
+
+  i = i + 1
+}
+
+// I2C STOP
+out 0b00
+out 0b10
+out 0b11
+
+// ==================== pixel data transaction ====================
+
+// I2C START
+out 0b11
+out 0b10
+out 0b00
+
+// Send the I2C address (0x78) then the data control byte (0x40).
+h = 0
+while (h < 2) {
+  if (h == 0) v = 0x78    // I2C write address
+  if (h == 1) v = 0x40    // control byte: data stream
+
+  mask = 0b10000000
+  while (mask > 0) {
+    if (v & mask) {
+      out 0b01
+      out 0b11
+      out 0b01
+    } else {
+      out 0b00
+      out 0b10
+      out 0b00
+    }
+    mask = mask / 2
+  }
+  out 0b01
+  out 0b11
+  out 0b01
+
+  h = h + 1
+}
+
+// Fill the whole frame: 8 pages x 128 columns = 1024 bytes.
+// (An 8-bit counter can't reach 1024, so we nest two loops.)
+page = 0
+while (page < 8) {
+  col = 0
+  while (col < 128) {
+    v = 0xFF               // pixel byte: 0xFF = 8 vertical pixels ON
+
+    mask = 0b10000000
+    while (mask > 0) {
+      if (v & mask) {
+        out 0b01
+        out 0b11
+        out 0b01
+      } else {
+        out 0b00
+        out 0b10
+        out 0b00
+      }
+      mask = mask / 2
+    }
+    out 0b01
+    out 0b11
+    out 0b01
+
+    col = col + 1
+  }
+  page = page + 1
+}
+
+// I2C STOP
+out 0b00
+out 0b10
+out 0b11

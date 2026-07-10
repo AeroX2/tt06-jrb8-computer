@@ -22,7 +22,13 @@ var jrb8Compiler = (() => {
   var web_exports = {};
   __export(web_exports, {
     CompileError: () => CompileError2,
-    compile: () => compile
+    TTBoard: () => TTBoard,
+    compile: () => compile,
+    compileAssembly: () => compileAssembly,
+    compileJrp: () => compileJrp,
+    compileSource: () => compileSource,
+    detectSourceKind: () => detectSourceKind,
+    flashAndRun: () => flashAndRun
   });
 
   // src/core/lexer.ts
@@ -1465,6 +1471,584 @@ var jrb8Compiler = (() => {
     }
   };
 
+  // src/flasher/ttinit.py
+  var ttinit_default = '# SPDX-License-Identifier: Apache-2.0\n# Copyright (C) 2024, Tiny Tapeout LTD\n\nimport os\nimport sys\n\n\ndef report(dict_or_key: dict, val: str = None):\n    if val is not None and not isinstance(dict_or_key, dict):\n        dict_or_key = {dict_or_key: val}\n\n    strs = list(map(lambda x: f"{x[0]}={x[1]}", dict_or_key.items()))\n    print("\\n".join(strs))\n\n\nprint()\nreport("sys.version", sys.version.split(";")[1].strip())\ntry:\n    sdk_version = next(filter(lambda f: f.startswith("release_v"), os.listdir("/")))\nexcept:\n    sdk_version = "unknown"\nreport("tt.sdk_version", sdk_version)\n';
+
+  // src/flasher/ttflash.py
+  var ttflash_default = `# SPDX-License-Identifier: Apache-2.0
+# Copyright (C) 2024, Tiny Tapeout LTD
+
+import binascii
+import gc
+import sys
+import time
+
+import micropython
+import rp2
+from machine import Pin
+from ttboard.demoboard import DemoBoard
+from ttboard.mode import RPMode
+
+@rp2.asm_pio(out_shiftdir=0, autopull=True, pull_thresh=8, autopush=True, push_thresh=8, sideset_init=(rp2.PIO.OUT_LOW,), out_init=rp2.PIO.OUT_LOW)
+def spi_cpha0():
+    out(pins, 1)             .side(0x0)
+    in_(pins, 1)             .side(0x1)
+
+@rp2.asm_pio(out_shiftdir=0, autopull=True, pull_thresh=8, autopush=True, push_thresh=8, sideset_init=(rp2.PIO.OUT_LOW,), out_init=rp2.PIO.OUT_LOW)
+def spi_cpha1():
+    pull(ifempty)            .side(0x0)
+    out(pins, 1)             .side(0x1).delay(1)
+    in_(pins, 1)             .side(0x0)
+    
+class PIOSPI:
+
+    def __init__(self, sm_id, pin_mosi, pin_miso, pin_sck, cpha=False, cpol=False, freq=1000000):
+        assert(not(cpol))
+        if not cpha:
+            self._sm = rp2.StateMachine(sm_id, spi_cpha0, freq=2*freq, sideset_base=Pin(pin_sck), out_base=Pin(pin_mosi), in_base=Pin(pin_miso))
+        else:
+            self._sm = rp2.StateMachine(sm_id, spi_cpha1, freq=4*freq, sideset_base=Pin(pin_sck), out_base=Pin(pin_mosi), in_base=Pin(pin_miso))
+        self._sm.active(1)
+
+        self._sm_tx_dreq = sm_id
+        self._sm_rx_dreq = sm_id + 4
+
+        self._dma_write = rp2.DMA()
+        self._dma_read = rp2.DMA()
+
+    @micropython.native
+    def write1(self, write):
+        self._sm.put(write, 24)
+        self._sm.get()
+
+    @micropython.native
+    def write(self, wdata):
+        dummy_bytes = bytearray(1)
+        self._dma_read.config(
+            read = self._sm,
+            write = dummy_bytes,
+            count = len(wdata),
+            ctrl = self._dma_read.pack_ctrl(
+                size      = 0,  # 0 = byte, 1 = half word, 2 = word
+                inc_read  = False,
+                inc_write = False,
+                treq_sel  = self._sm_rx_dreq
+            ),
+            trigger = True
+        )
+
+        self._dma_write.config(
+            read = wdata,
+            write = self._sm,
+            count = len(wdata),
+            ctrl = self._dma_write.pack_ctrl(
+                size      = 0,  # 0 = byte, 1 = half word, 2 = word
+                inc_read  = True,
+                inc_write = False,
+                treq_sel  = self._sm_tx_dreq
+            ),
+            trigger = True
+        )
+
+        while self._dma_read.active():
+            pass
+        
+    @micropython.native
+    def read(self, n, write=0):
+        read_buf = bytearray(n)
+        self.readinto(read_buf, write)
+        return read_buf
+
+    @micropython.native
+    def readinto(self, rdata, write=0):
+        write_bytes = bytearray(1)
+        write_bytes[0] = write
+        self._dma_read.config(
+            read = self._sm,
+            write = rdata,
+            count = len(rdata),
+            ctrl = self._dma_read.pack_ctrl(
+                size      = 0,  # 0 = byte, 1 = half word, 2 = word
+                inc_read  = False,
+                inc_write = True,
+                treq_sel  = self._sm_rx_dreq
+            ),
+            trigger = True
+        )
+
+        self._dma_write.config(
+            read = write_bytes,
+            write = self._sm,
+            count = len(rdata),
+            ctrl = self._dma_write.pack_ctrl(
+                size      = 0,  # 0 = byte, 1 = half word, 2 = word
+                inc_read  = False,
+                inc_write = False,
+                treq_sel  = self._sm_tx_dreq
+            ),
+            trigger = True
+        )
+        
+        while self._dma_read.active():
+            pass
+
+    @micropython.native
+    def write_read_blocking(self, wdata):
+        rdata = bytearray(len(wdata))
+
+        self._dma_read.config(
+            read = self._sm,
+            write = rdata,
+            count = len(rdata),
+            ctrl = self._dma_read.pack_ctrl(
+                size      = 0,  # 0 = byte, 1 = half word, 2 = word
+                inc_read  = False,
+                inc_write = True,
+                treq_sel  = self._sm_rx_dreq
+            ),
+            trigger = True
+        )
+
+        self._dma_write.config(
+            read = wdata,
+            write = self._sm,
+            count = len(wdata),
+            ctrl = self._dma_write.pack_ctrl(
+                size      = 0,  # 0 = byte, 1 = half word, 2 = word
+                inc_read  = True,
+                inc_write = False,
+                treq_sel  = self._sm_tx_dreq
+            ),
+            trigger = True
+        )
+
+        while self._dma_read.active():
+            pass
+
+        return rdata
+
+class SPIFlash:
+    PAGE_SIZE = micropython.const(256)
+    SECTOR_SIZE = micropython.const(4096)
+    BLOCK_SIZE = micropython.const(65536)
+
+    def __init__(self, tt):
+        self.tt = tt
+        self.spi = PIOSPI(0, tt.pins.uio1.raw_pin, tt.pins.uio2.raw_pin, tt.pins.uio3.raw_pin, freq=10_000_000)
+        self.cs = tt.pins.uio0.raw_pin
+        self.cs.init(self.cs.OUT, value=1)
+
+    @micropython.native
+    def read_status(self):
+        self.cs(0)
+        try:
+            return self.spi.write_read_blocking(b"\\x05\\xFF")[1]  # 'Read Status Register-1' command
+        finally:
+            self.cs(1)
+
+    @micropython.native
+    def wait_not_busy(self, timeout=10000):
+        while self.read_status() & 0x1:
+            if timeout == 0:
+                raise RuntimeError("Timed out while waiting for flash device")
+            timeout -= 1
+            time.sleep_us(1)
+
+    def identify(self):
+        self.wait_not_busy()
+        self.cs(0)
+        try:
+            self.spi.write1(0x9F)
+            return self.spi.read(3, 0x00)
+        finally:
+            self.cs(1)
+
+    @micropython.native
+    def write_enable(self):
+        self.wait_not_busy()
+        self.cs(0)
+        try:
+            self.spi.write1(0x06)
+        finally:
+            self.cs(1)
+
+    @micropython.native
+    def erase_sector(self, address):
+        self.wait_not_busy()
+        self.write_enable()
+        self.cs(0)
+        try:
+            self.spi.write(b"\\x20" + address.to_bytes(3, "big"))
+        finally:
+            self.cs(1)
+
+    @micropython.native
+    def program_page(self, address, data):
+        self.wait_not_busy()
+        self.write_enable()
+        self.cs(0)
+        try:
+            self.spi.write(b"\\x02" + address.to_bytes(3, "big") + data)
+        finally:
+            self.cs(1)
+
+    @micropython.native
+    def program(self, address, data):
+        offset = 0
+        while offset < len(data):
+            page_address = (address + offset) & ~(self.PAGE_SIZE - 1)
+            page_offset = (address + offset) % self.PAGE_SIZE
+            chunk_size = min(self.PAGE_SIZE - page_offset, len(data) - offset)
+            chunk = data[offset : offset + chunk_size]
+            self.program_page(page_address + page_offset, chunk)
+            offset += chunk_size
+
+    def program_sectors(self, start_address, verify=True):
+        addr = start_address
+        gc.collect()
+        verify_buffer = bytearray(1)
+        try:
+            micropython.kbd_intr(-1)  # Disable Ctrl-C
+            print(f"flash_prog={addr:X}")
+            while True:
+                line = sys.stdin.buffer.readline()
+                if not line:
+                    break
+                chunk_length = int(line.strip())
+                if chunk_length == 0:
+                    break
+
+                # Erase the sector while receiving the data
+                end_address = addr + chunk_length
+                for erase_addr in range(addr, end_address, self.SECTOR_SIZE):
+                   self.erase_sector(erase_addr)
+
+                chunk_data = sys.stdin.buffer.read(chunk_length)
+                self.program(addr, chunk_data)
+
+                if verify:
+                    if chunk_length != len(verify_buffer):
+                        verify_buffer = bytearray(chunk_length)
+                    self.read_data_into(addr, verify_buffer)
+                    if verify_buffer != chunk_data:
+                        raise RuntimeError("Verification failed")
+
+                addr += len(chunk_data)
+                print(f"flash_prog={addr:X}")
+        finally:
+            micropython.kbd_intr(3)
+        print(f"flash_prog=ok")
+
+    @micropython.native
+    def read_data_into(self, address, rdata):
+        self.wait_not_busy()
+        self.cs(0)
+        try:
+            self.spi.write(b"\\x03" + address.to_bytes(3, "big"))
+            return self.spi.readinto(rdata)
+        finally:
+            self.cs(1)
+
+
+tt = DemoBoard.get()
+tt.mode = RPMode.ASIC_RP_CONTROL
+tt.shuttle.tt_um_chip_rom.enable()
+flash = SPIFlash(tt)
+print(f"tt.flash_id={binascii.hexlify(flash.identify()).decode()}")
+`;
+
+  // src/flasher/tt_board.ts
+  var RAW_REPL_ENTER = "";
+  var EXECUTE = "";
+  var INTERRUPT_AND_EXIT = "";
+  var SECTOR_SIZE = 4096;
+  var LineBreakTransformer = class {
+    buffer = "";
+    transform(chunk, controller) {
+      this.buffer += chunk;
+      const lines = this.buffer.split(/\r\n|\r|\n/);
+      this.buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        controller.enqueue(line);
+      }
+    }
+    flush(controller) {
+      if (this.buffer.length > 0) {
+        controller.enqueue(this.buffer);
+        this.buffer = "";
+      }
+    }
+  };
+  function cleanupRawREPL(value) {
+    return value.replace(/^(\x04+>OK)+\x04*/, "").replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
+  }
+  var TTBoard = class _TTBoard {
+    constructor(port, options = {}) {
+      this.port = port;
+      this.options = options;
+    }
+    reader;
+    readableStreamClosed;
+    writableStreamClosed;
+    writer;
+    binaryWriter;
+    lineListeners = /* @__PURE__ */ new Set();
+    version = null;
+    flashId = null;
+    booted = false;
+    /** Open a Web Serial port and construct a connected board. */
+    static async request(options = {}) {
+      if (typeof navigator === "undefined" || !navigator.serial) {
+        throw new Error(
+          "Web Serial is not available. Use Chrome or Edge over https:// or http://localhost."
+        );
+      }
+      const port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 115200 });
+      const board = new _TTBoard(port, options);
+      await board.start();
+      return board;
+    }
+    // ---- low-level IO -------------------------------------------------------
+    async writeText(data) {
+      if (this.binaryWriter) {
+        this.binaryWriter.releaseLock();
+        this.binaryWriter = void 0;
+      }
+      if (!this.writer) {
+        const textEncoderStream = new TextEncoderStream();
+        this.writer = textEncoderStream.writable.getWriter();
+        this.writableStreamClosed = textEncoderStream.readable.pipeTo(this.port.writable);
+      }
+      await this.writer.write(data);
+    }
+    async writeBinary(data) {
+      if (this.writer) {
+        await this.writer.close();
+        await this.writableStreamClosed;
+        this.writer = void 0;
+      }
+      if (!this.binaryWriter) {
+        this.binaryWriter = this.port.writable.getWriter();
+      }
+      await this.binaryWriter.write(data);
+    }
+    /** Run a statement/block in the raw REPL (terminated by Ctrl-D). */
+    async sendCommand(command) {
+      this.options.onLog?.(command, true);
+      await this.writeText(`${command}${EXECUTE}`);
+    }
+    processInput(line) {
+      if (line.startsWith("BOOT: ")) {
+        this.booted = true;
+      }
+      for (const listener of this.lineListeners) {
+        listener(line.trim());
+      }
+      const eq = line.indexOf("=");
+      if (eq > 0) {
+        const name = line.slice(0, eq);
+        const value = line.slice(eq + 1);
+        if (name === "tt.sdk_version") {
+          this.version = value.replace(/^release_v/, "");
+        } else if (name === "tt.flash_id") {
+          this.flashId = value.trim();
+        }
+      }
+      this.options.onLog?.(line, false);
+    }
+    waitUntil(condition, timeoutMs = 15e3) {
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          this.lineListeners.delete(listener);
+          reject(new Error("Timed out waiting for board response"));
+        }, timeoutMs);
+        const listener = (line) => {
+          if (condition(line)) {
+            clearTimeout(timer);
+            this.lineListeners.delete(listener);
+            resolve(line);
+          }
+        };
+        this.lineListeners.add(listener);
+      });
+    }
+    // ---- lifecycle ----------------------------------------------------------
+    /** Start the read loop, ensure a clean REPL, and load the flasher scripts. */
+    async start() {
+      void this.readLoop();
+      await this.writeText("\n");
+      await this.writeText('print(f"tt.sdk_version={tt.version}")\r\n');
+      await delay(100);
+      if (this.booted) {
+        for (let i = 0; i < 60 && this.version == null; i++) {
+          await delay(100);
+        }
+      }
+      if (this.version == null) {
+        await this.writeText(INTERRUPT_AND_EXIT);
+        await this.writeText(EXECUTE);
+      }
+      await this.writeText(RAW_REPL_ENTER);
+      await this.writeText(ttinit_default + EXECUTE);
+      await this.loadFlasher();
+    }
+    /**
+     * (Re)run ttflash.py so the RP2040 is in flasher context: ASIC_RP_CONTROL,
+     * tt_um_chip_rom enabled, and a fresh SPIFlash driving uio0-3. Needed before
+     * programming, including re-flashing after a design has been run.
+     */
+    async prepareFlash() {
+      await this.loadFlasher();
+    }
+    async loadFlasher() {
+      const ready = this.waitUntil((line) => line.startsWith("tt.flash_id="), 2e4);
+      await this.writeText(ttflash_default + EXECUTE);
+      await ready;
+    }
+    async readLoop() {
+      const { port } = this;
+      while (port.readable) {
+        const textDecoder = new TextDecoderStream();
+        this.readableStreamClosed = port.readable.pipeTo(textDecoder.writable).catch(() => {
+        });
+        this.reader = textDecoder.readable.pipeThrough(new TransformStream(new LineBreakTransformer())).getReader();
+        try {
+          for (; ; ) {
+            const { value, done } = await this.reader.read();
+            if (done) {
+              this.reader.releaseLock();
+              return;
+            }
+            if (value) {
+              this.processInput(cleanupRawREPL(value));
+            }
+          }
+        } catch {
+        } finally {
+          this.reader.releaseLock();
+        }
+      }
+    }
+    // ---- high-level operations ---------------------------------------------
+    /**
+     * Program a raw binary image into the QSPI Pmod flash starting at `offset`.
+     * The image is streamed to the board in 4 KB sector chunks.
+     */
+    async programFlash(offset, data, onProgress) {
+      const total = data.byteLength;
+      const progressListener = (line) => {
+        if (line.startsWith("flash_prog=")) {
+          const value = line.slice("flash_prog=".length);
+          if (value === "ok") {
+            onProgress?.({ written: total, total });
+          } else {
+            const lastAddress = parseInt(value, 16);
+            if (!Number.isNaN(lastAddress)) {
+              onProgress?.({ written: lastAddress - offset, total });
+            }
+          }
+        }
+      };
+      this.lineListeners.add(progressListener);
+      try {
+        const startOffset = `0x${offset.toString(16)}`;
+        const firstReady = this.waitUntil((line) => line.startsWith("flash_prog="));
+        await this.sendCommand(`flash.program_sectors(${startOffset})`);
+        await firstReady;
+        for (let i = 0; i < data.length; i += SECTOR_SIZE) {
+          const sector = data.slice(i, i + SECTOR_SIZE);
+          const ready = this.waitUntil((line) => line.startsWith("flash_prog="), 3e4);
+          await this.writeBinary(new TextEncoder().encode(`${sector.length}\r
+`));
+          await this.writeBinary(sector);
+          await ready;
+        }
+        const done = this.waitUntil((line) => line === "flash_prog=ok", 3e4);
+        await this.writeBinary(new TextEncoder().encode("0\r\n"));
+        await done;
+      } finally {
+        this.lineListeners.delete(progressListener);
+      }
+    }
+    /**
+     * Enable project `index` on the mux and clock it at `clockHz`.
+     *
+     * Note: this is a separate board state from flashing. ttflash.py left the
+     * board in ASIC_RP_CONTROL with tt_um_chip_rom enabled; enabling `index`
+     * re-safes the bidir pins (via the mux reset) so the ASIC can drive the QSPI
+     * flash itself.
+     */
+    /** Run a raw-REPL block and wait for `<token>=ok`, surfacing tracebacks. */
+    async runBlock(lines, okToken) {
+      const script = [...lines, `print("${okToken}=ok")`].join("\n");
+      const done = this.waitUntil(
+        (line) => line === `${okToken}=ok` || line.startsWith("Traceback"),
+        2e4
+      );
+      await this.sendCommand(script);
+      const result = await done;
+      if (result.startsWith("Traceback")) {
+        throw new Error(`Board raised an error during "${okToken}" (see log).`);
+      }
+    }
+    /** Enable a project on the mux (does not touch the clock). */
+    async enableDesign(index) {
+      await this.runBlock(
+        [
+          "from ttboard.mode import RPMode",
+          "tt.mode = RPMode.ASIC_RP_CONTROL",
+          `tt.shuttle[${index}].enable()`
+        ],
+        "des"
+      );
+    }
+    /**
+     * Set the project clock frequency (Hz). Safe to call repeatedly, no reflash.
+     *
+     * clock_project_PWM rejects freqHz > max_rp2040_freq // 2 (default 133 MHz ->
+     * 66.5 MHz ceiling), so for higher targets we raise max_rp2040_freq to
+     * overclock the RP2040 sysclk, matching what Commander does for 75/100 MHz.
+     */
+    async setClock(clockHz) {
+      const maxRp2040 = Math.max(133e6, clockHz * 2);
+      await this.runBlock(
+        [`tt.clock_project_PWM(${clockHz}, max_rp2040_freq=${maxRp2040})`],
+        "clk"
+      );
+    }
+    /** Enable a project and start its clock in one step. */
+    async runDesign(index, clockHz) {
+      await this.enableDesign(index);
+      await this.setClock(clockHz);
+    }
+    async close() {
+      try {
+        await this.reader?.cancel();
+      } catch {
+      }
+      await this.readableStreamClosed?.catch(() => {
+      });
+      try {
+        await this.writeText(INTERRUPT_AND_EXIT);
+      } catch {
+      }
+      try {
+        await this.writer?.close();
+        await this.writableStreamClosed?.catch(() => {
+        });
+        if (this.binaryWriter) {
+          await this.binaryWriter.close();
+        }
+      } catch {
+      }
+      await this.port.close();
+    }
+  };
+  function delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   // web.ts
   var CompileError2 = class extends Error {
     constructor(message) {
@@ -1472,22 +2056,58 @@ var jrb8Compiler = (() => {
       this.name = "CompileError";
     }
   };
-  async function compile(source) {
+  function detectSourceKind(source, filename) {
+    if (filename) {
+      const ext = filename.toLowerCase().split(".").pop();
+      if (ext === "jrp")
+        return "jrp";
+      if (ext === "j" || ext === "asm" || ext === "s")
+        return "asm";
+    }
+    if (/\b(var|while|if|else)\b|[{}]/.test(source) && !/^\s*:/m.test(source)) {
+      return "jrp";
+    }
+    return "asm";
+  }
+  function compileAssembly(source) {
+    const assembler = new Assembler();
+    const assembly = source.split("\n");
+    const bytecode = assembler.assemble(assembly);
+    const machineCode = assembler.hexOutput(bytecode);
+    return { assembly, machineCode };
+  }
+  function compileJrp(source) {
+    const lexer = new Lexer(source);
+    const tokens = lexer.scanTokens();
+    const parser = new Parser(tokens);
+    const ast = parser.parse();
+    const compiler = new HardwareCompiler();
+    const assembly = compiler.compileToAssembly(ast);
+    const machineCode = compiler.compileToBytecode(assembly);
+    return { assembly, machineCode };
+  }
+  async function compileSource(source, filename) {
     try {
-      const lexer = new Lexer(source);
-      const tokens = lexer.scanTokens();
-      const parser = new Parser(tokens);
-      const ast = parser.parse();
-      const compiler = new HardwareCompiler();
-      const assembly = compiler.compileToAssembly(ast);
-      const machineCode = compiler.compileToBytecode(assembly);
-      return {
-        assembly,
-        machineCode
-      };
+      const kind = detectSourceKind(source, filename);
+      return kind === "jrp" ? compileJrp(source) : compileAssembly(source);
     } catch (error) {
       throw new CompileError2(error instanceof Error ? error.message : "Unknown compilation error");
     }
+  }
+  async function compile(source) {
+    try {
+      return compileJrp(source);
+    } catch (error) {
+      throw new CompileError2(error instanceof Error ? error.message : "Unknown compilation error");
+    }
+  }
+  async function flashAndRun(machineCode, options = {}) {
+    const { projectIndex = 204, clockHz = 3e7, offset = 0, onProgress, onLog } = options;
+    const bytes = machineCode instanceof Uint8Array ? machineCode : new Uint8Array(machineCode);
+    const board = await TTBoard.request({ onLog });
+    await board.programFlash(offset, bytes, onProgress);
+    await board.runDesign(projectIndex, clockHz);
+    return board;
   }
   return __toCommonJS(web_exports);
 })();

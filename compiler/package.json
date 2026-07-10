@@ -6,7 +6,7 @@
   "scripts": {
     "test": "jest",
     "build": "tsc && npm run bundle",
-    "bundle": "esbuild web.ts --bundle --outfile=dist/bundle.js --global-name=jrb8Compiler --platform=browser",
+    "bundle": "esbuild web.ts --bundle --outfile=dist/bundle.js --global-name=jrb8Compiler --platform=browser --loader:.py=text",
     "start": "ts-node compiler.ts",
     "convert": "node scripts/convert_csv_to_ts.js",
     "dev": "npm run build && http-server ./dist -o -c-1",

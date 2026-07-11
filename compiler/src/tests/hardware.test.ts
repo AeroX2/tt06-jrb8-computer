@@ -72,7 +72,10 @@ describe("Hardware VM Integration Tests", () => {
 
   test("unary operations work correctly", () => {
     const results = runProgram("unary.jrp");
-    expect(results).toEqual([-5 & 0xff, 1, 1, 250]);
+    // -x=251, !0=1, !(5>3)=!1=0, ~5=250. (The old `!` was broken and always
+    // returned 1 - it clobbered the zero flag with `opp 0` before branching -
+    // so this used to assert [.., 1, 1, ..]. Fixed to latch via `opp a`.)
+    expect(results).toEqual([-5 & 0xff, 1, 0, 250]);
   });
 
   test("variable declarations without initializers work correctly", () => {

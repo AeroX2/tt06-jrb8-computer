@@ -171,12 +171,18 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
         result.push("opp ~a");
         break;
       case Token.BANG: {
-        const skipLabel = this.createLabel();
-        result.push("cmp a 0");
+        // !a  ->  (a == 0) ? 1 : 0.  `opp a` is identity but latches the zero
+        // flag from a (unlike `cmp a 0`, which does not latch - errata E1), so
+        // branch on it *before* clobbering a with the 0/1 result.
+        const zeroLabel = this.createLabel();
+        const endLabel = this.createLabel();
+        result.push("opp a");
+        result.push(`jmp = ${zeroLabel}`);
         result.push("opp 0");
-        result.push(`jmp != ${skipLabel}`);
+        result.push(`jmp ${endLabel}`);
+        result.push(`:${zeroLabel}`);
         result.push("opp 1");
-        result.push(`:${skipLabel}`);
+        result.push(`:${endLabel}`);
         break;
       }
     }
@@ -233,9 +239,10 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
     const result = expr.left.accept(this);
 
     if (expr.op === Token.AND_AND) {
-      result.push("cmp a 0", `jmp = ${endLabel}`);
+      // `opp a` latches the zero flag from a; `cmp a 0` does not (errata E1).
+      result.push("opp a", `jmp = ${endLabel}`);
     } else if (expr.op === Token.OR_OR) {
-      result.push("cmp a 0", `jmp != ${endLabel}`);
+      result.push("opp a", `jmp != ${endLabel}`);
     } else {
       throw new CompileError(`Unknown logical operator: ${expr.op}`);
     }
@@ -257,7 +264,8 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
     const elseLabel = this.createLabel();
     const endLabel = this.createLabel();
 
-    result.push("cmp a 0", `jmp = ${elseLabel}`);
+    // `opp a` latches the zero flag from a; `cmp a 0` does not (errata E1).
+    result.push("opp a", `jmp = ${elseLabel}`);
 
     result.push(...stmt.thenBranch.accept(this));
     result.push(`jmp ${endLabel}`);
@@ -284,7 +292,8 @@ export class HardwareCompiler implements ExprVisitor<string[]>, StmtVisitor<stri
     result.push(`:${startLabel}`);
 
     if (condition) {
-      result.push(...condition.accept(this), "cmp a 0", `jmp = ${endLabel}`);
+      // `opp a` latches the zero flag from a; `cmp a 0` does not (errata E1).
+      result.push(...condition.accept(this), "opp a", `jmp = ${endLabel}`);
     }
 
     result.push(...body.accept(this));

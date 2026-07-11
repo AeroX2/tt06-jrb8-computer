@@ -3,7 +3,10 @@ import fs from "fs";
 import { HardwareVM } from "../vm/hardware_vm";
 import { Assembler } from "../core/assembler";
 
-const assemblyDir = path.join(__dirname, "../../../example_programs/assembly");
+const assemblyDirs = [
+  path.join(__dirname, "../../../example_programs/assembly"),
+  path.join(__dirname, "../../../silicon_bugs_programs"),
+];
 
 interface ExpectedState {
   maxSteps: number;
@@ -51,13 +54,16 @@ function parseExpectedFile(content: string): ExpectedState {
 }
 
 describe("Assembly Program Validation", () => {
-  const testFiles = fs
-    .readdirSync(assemblyDir)
-    .filter(f => f.endsWith(".e"))
-    .map(f => ({
-      expectedPath: path.join(assemblyDir, f),
-      assemblyPath: path.join(assemblyDir, f.replace(".e", ".j")),
-    }));
+  const testFiles = assemblyDirs.flatMap(dir =>
+    fs
+      .readdirSync(dir)
+      .filter(f => f.endsWith(".e"))
+      .map(f => ({
+        name: f.replace(".e", ""),
+        expectedPath: path.join(dir, f),
+        assemblyPath: path.join(dir, f.replace(".e", ".j")),
+      }))
+  );
 
   test.each(testFiles)("$name validates program execution", ({ assemblyPath, expectedPath }) => {
     // Read and parse files

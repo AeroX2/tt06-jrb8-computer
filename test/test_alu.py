@@ -147,7 +147,9 @@ def assert_(cond):
 async def test_alu_additions_overflows(dut):
     alu, clk, a, b = await setup(dut)
 
-    # a+1
+    # a+1: incrementing 127 overflows the SIGNED range (127 -> -128) but produces
+    # NO unsigned carry (127 + 1 = 128 fits in 8 bits, so bit 8 is 0). Assert the
+    # overflow flag, not carry -- the previous `carryout == 1` assertion was wrong.
     alu.a.value = Force(127)
     await test(
         alu,
@@ -155,7 +157,7 @@ async def test_alu_additions_overflows(dut):
         [0x64, 0x65, 0x66, 0x67],
         [-128, -128, -128, -128],
         True,
-        lambda alu: assert_(alu.carryout.value == 1),
+        lambda alu: assert_(alu.overout.value == 1 and alu.carryout.value == 0),
     )
 
     # a-1

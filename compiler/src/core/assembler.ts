@@ -159,7 +159,34 @@ export class Assembler {
     return false;
   }
 
+  // Reject opcodes that are broken on the manufactured silicon (docs/hardware-errata.md)
+  // so no program can silently assemble to code that misbehaves on the chip.
+  // `opp clr` is intentionally NOT rejected: it is a harmless no-op on silicon (E6),
+  // which the VM models, so passing it through is safe.
+  private rejectBrokenSiliconOpcode(line: string): void {
+    const jmpFlag = line.match(/^jmp\s+([zocs])\s+/);
+    if (jmpFlag) {
+      const flag = jmpFlag[1];
+      const alt =
+        flag === "z"
+          ? "Use `jmp = <label>` instead."
+          : flag === "c"
+            ? "Use `jmp < <label>` instead."
+            : "There is no working silicon substitute for this flag test.";
+      throw new AssemblerError(
+        `\`jmp ${flag} {number}\` is broken on silicon (errata E5): a taken branch jumps to {N,N} (= N*0x0101), not the operand address. ${alt}`
+      );
+    }
+    if (/^jmpr\b/.test(line)) {
+      throw new AssemblerError(
+        "`jmpr` is broken on silicon (errata E4): it fetches two operand bytes, placing the offset in the high byte and desyncing the instruction stream. Use absolute `jmp <label>` instead."
+      );
+    }
+  }
+
   private translateInstructions(line: string) {
+    this.rejectBrokenSiliconOpcode(line);
+
     const variables = line.split(" ");
     const opp = variables[0];
     const oppArgs = variables.slice(1).join(" ");

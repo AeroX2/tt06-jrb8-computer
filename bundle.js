@@ -1039,6 +1039,7 @@ var jrb8Compiler = (() => {
   var COMPARE = /([abcd]) ([abcd]|0|1|-1|255)/;
   var JUMP = /(\.?(<=|<|=|>|>=) [abcd])|(.+)/;
   var OUT_PATTERN = /[abcd]|[0-9]+|ram\[[0-9]+\]|ram\[[abcd]\]/;
+  var SET_RAMPAGE = /[abcd] rampage/;
   var Assembler = class {
     final = [];
     labels = /* @__PURE__ */ new Map();
@@ -1074,6 +1075,7 @@ var jrb8Compiler = (() => {
       opp: () => true,
       load: (x) => this.checkLoad(x),
       save: (x) => this.checkSave(x),
+      set: (x) => x.match(SET_RAMPAGE) !== null,
       in: (x) => x.match(REGISTER) !== null,
       out: (x) => x.match(OUT_PATTERN) !== null,
       halt: (x) => x === ""
@@ -1151,7 +1153,27 @@ var jrb8Compiler = (() => {
       }
       return false;
     }
+    // Reject opcodes that are broken on the manufactured silicon (docs/hardware-errata.md)
+    // so no program can silently assemble to code that misbehaves on the chip.
+    // `opp clr` is intentionally NOT rejected: it is a harmless no-op on silicon (E6),
+    // which the VM models, so passing it through is safe.
+    rejectBrokenSiliconOpcode(line) {
+      const jmpFlag = line.match(/^jmp\s+([zocs])\s+/);
+      if (jmpFlag) {
+        const flag = jmpFlag[1];
+        const alt = flag === "z" ? "Use `jmp = <label>` instead." : flag === "c" ? "Use `jmp < <label>` instead." : "There is no working silicon substitute for this flag test.";
+        throw new AssemblerError(
+          `\`jmp ${flag} {number}\` is broken on silicon (errata E5): a taken branch jumps to {N,N} (= N*0x0101), not the operand address. ${alt}`
+        );
+      }
+      if (/^jmpr\b/.test(line)) {
+        throw new AssemblerError(
+          "`jmpr` is broken on silicon (errata E4): it fetches two operand bytes, placing the offset in the high byte and desyncing the instruction stream. Use absolute `jmp <label>` instead."
+        );
+      }
+    }
     translateInstructions(line) {
+      this.rejectBrokenSiliconOpcode(line);
       const variables = line.split(" ");
       const opp = variables[0];
       const oppArgs = variables.slice(1).join(" ");
@@ -1227,6 +1249,8 @@ var jrb8Compiler = (() => {
     variables = /* @__PURE__ */ new Map();
     nextVarAddress = 0;
     labelCounter = 0;
+    scratchDepth = 0;
+    lowestScratchAddress = 256;
     // Group related operators into constants for better maintainability
     static COMPARISON_OPERATORS = /* @__PURE__ */ new Set([
       ">" /* GREATER */,
@@ -1235,11 +1259,12 @@ var jrb8Compiler = (() => {
       "<=" /* LESS_EQUAL */,
       "==" /* EQUAL_EQUAL */
     ]);
-    static RIGHT_EVAL_FIRST_OPERATORS = /* @__PURE__ */ new Set(["-" /* MINUS */, "/" /* SLASH */]);
     compileToAssembly(statements) {
       this.variables.clear();
       this.nextVarAddress = 0;
       this.labelCounter = 0;
+      this.scratchDepth = 0;
+      this.lowestScratchAddress = 256;
       const assemblyLines = [];
       for (const stmt of statements) {
         assemblyLines.push(...stmt.accept(this));
@@ -1259,28 +1284,93 @@ var jrb8Compiler = (() => {
     createLabel() {
       return `L${this.labelCounter++}`;
     }
+    /**
+     * Reserve compiler-owned cells at the top of RAM page 0.  Spilling operands
+     * makes nested expressions reliable on a four-register machine and leaves
+     * the registers free for builtins such as peek/poke.
+     */
+    withScratch(count, callback) {
+      const startDepth = this.scratchDepth;
+      const addresses = Array.from({ length: count }, (_, index) => 255 - startDepth - index);
+      const lowest = addresses[addresses.length - 1] ?? 256;
+      if (lowest < this.nextVarAddress) {
+        throw new CompileError("Program needs more than 256 variable and temporary RAM cells");
+      }
+      this.scratchDepth += count;
+      this.lowestScratchAddress = Math.min(this.lowestScratchAddress, lowest);
+      try {
+        return callback(addresses);
+      } finally {
+        this.scratchDepth = startDepth;
+      }
+    }
+    /** Emit a literal or page-0 variable directly into a chosen register. */
+    compileSimpleOperand(expr, register) {
+      if (expr instanceof Grouping) {
+        return this.compileSimpleOperand(expr.expression, register);
+      }
+      if (expr instanceof LiteralNumber) {
+        if (expr.val < 0 || expr.val > 255) {
+          throw new CompileError("Number out of range (0-255)");
+        }
+        if (register === "a" && expr.val === 0)
+          return ["opp 0"];
+        if (register === "a" && expr.val === 1)
+          return ["opp 1"];
+        return [`load rom ${register} ${expr.val}`];
+      }
+      if (expr instanceof LiteralBool) {
+        if (register === "a")
+          return [`opp ${expr.val ? 1 : 0}`];
+        return [`load rom ${register} ${expr.val ? 1 : 0}`];
+      }
+      if (expr instanceof Variable) {
+        const address = this.variables.get(expr.name.value ?? "");
+        if (address === void 0) {
+          throw new CompileError(`Undefined variable: ${expr.name.value}`);
+        }
+        return [`load ram[${address}] ${register}`];
+      }
+      return void 0;
+    }
+    literalValue(expr) {
+      if (expr instanceof Grouping)
+        return this.literalValue(expr.expression);
+      if (expr instanceof LiteralNumber)
+        return expr.val;
+      if (expr instanceof LiteralBool)
+        return expr.val ? 1 : 0;
+      return void 0;
+    }
     visit(expr) {
       return expr.accept(this);
     }
     visitBinary(expr) {
       if (_HardwareCompiler.COMPARISON_OPERATORS.has(expr.op)) {
         return this.handleComparison(expr);
-      } else if (_HardwareCompiler.RIGHT_EVAL_FIRST_OPERATORS.has(expr.op)) {
-        return this.handleRightFirst(expr);
-      } else {
-        return this.handleLeftFirst(expr);
       }
+      return this.handleBinary(expr);
     }
     handleComparison(expr) {
-      const result = [];
-      result.push(
-        ...expr.left.accept(this),
-        "mov a b",
-        ...expr.right.accept(this),
-        "mov a c",
-        "opp 0",
-        "cmp b c"
-      );
+      const left = this.compileSimpleOperand(expr.left, "b");
+      const right = this.compileSimpleOperand(expr.right, "c");
+      if (left && right) {
+        return this.finishComparison([...left, ...right, "opp 0", "cmp b c"], expr.op);
+      }
+      return this.withScratch(1, ([leftAddress]) => {
+        const result = [
+          ...expr.left.accept(this),
+          `save a ram[${leftAddress}]`,
+          ...expr.right.accept(this),
+          "mov a c",
+          `load ram[${leftAddress}] b`,
+          "opp 0",
+          "cmp b c"
+        ];
+        return this.finishComparison(result, expr.op);
+      });
+    }
+    finishComparison(result, operator) {
       const skipLabel = this.createLabel();
       const jumpMap = {
         [">" /* GREATER */]: "<=",
@@ -1289,35 +1379,34 @@ var jrb8Compiler = (() => {
         ["<=" /* LESS_EQUAL */]: ">",
         ["==" /* EQUAL_EQUAL */]: "!="
       };
-      result.push(`jmp ${jumpMap[expr.op]} ${skipLabel}`);
-      result.push("opp 1");
-      result.push(`:${skipLabel}`);
+      result.push(`jmp ${jumpMap[operator]} ${skipLabel}`, "opp 1", `:${skipLabel}`);
       return result;
     }
-    handleRightFirst(expr) {
-      const result = [];
-      result.push(...expr.right.accept(this), "mov a b", ...expr.left.accept(this));
-      const opMap = {
-        ["-" /* MINUS */]: "a-b",
-        ["/" /* SLASH */]: "a/b"
-      };
-      result.push(`opp ${opMap[expr.op]}`);
-      return result;
-    }
-    handleLeftFirst(expr) {
-      const result = [];
-      result.push(...expr.left.accept(this), "mov a b", ...expr.right.accept(this));
+    handleBinary(expr) {
       const opMap = {
         ["+" /* PLUS */]: "a+b",
+        ["-" /* MINUS */]: "a-b",
         ["*" /* STAR */]: "a*b",
+        ["/" /* SLASH */]: "a/b",
         ["&" /* AND */]: "a&b",
         ["|" /* OR */]: "a|b"
       };
       if (opMap[expr.op] === void 0) {
         throw new CompileError(`Unknown binary operator: ${expr.op}`);
       }
-      result.push(`opp ${opMap[expr.op]}`);
-      return result;
+      const left = this.compileSimpleOperand(expr.left, "a");
+      const right = this.compileSimpleOperand(expr.right, "b");
+      if (left && right) {
+        return [...left, ...right, `opp ${opMap[expr.op]}`];
+      }
+      return this.withScratch(1, ([leftAddress]) => [
+        ...expr.left.accept(this),
+        `save a ram[${leftAddress}]`,
+        ...expr.right.accept(this),
+        "mov a b",
+        `load ram[${leftAddress}] a`,
+        `opp ${opMap[expr.op]}`
+      ]);
     }
     visitGrouping(expr) {
       return expr.expression.accept(this);
@@ -1332,12 +1421,15 @@ var jrb8Compiler = (() => {
           result.push("opp ~a");
           break;
         case "!" /* BANG */: {
-          const skipLabel = this.createLabel();
-          result.push("cmp a 0");
+          const zeroLabel = this.createLabel();
+          const endLabel = this.createLabel();
+          result.push("opp a");
+          result.push(`jmp = ${zeroLabel}`);
           result.push("opp 0");
-          result.push(`jmp != ${skipLabel}`);
+          result.push(`jmp ${endLabel}`);
+          result.push(`:${zeroLabel}`);
           result.push("opp 1");
-          result.push(`:${skipLabel}`);
+          result.push(`:${endLabel}`);
           break;
         }
       }
@@ -1385,17 +1477,111 @@ var jrb8Compiler = (() => {
       const endLabel = this.createLabel();
       const result = expr.left.accept(this);
       if (expr.op === "&&" /* AND_AND */) {
-        result.push("cmp a 0", `jmp = ${endLabel}`);
+        result.push("opp a", `jmp = ${endLabel}`);
       } else if (expr.op === "||" /* OR_OR */) {
-        result.push("cmp a 0", `jmp != ${endLabel}`);
+        result.push("opp a", `jmp != ${endLabel}`);
       } else {
         throw new CompileError(`Unknown logical operator: ${expr.op}`);
       }
       result.push(...expr.right.accept(this), `:${endLabel}`);
       return result;
     }
-    visitCall(_expr) {
-      throw new CompileError("Function calls not yet implemented for hardware");
+    visitCall(expr) {
+      const callee = expr.callee;
+      const name = callee instanceof Variable ? callee.name.value : void 0;
+      if (name === "peek") {
+        if (expr.args.length !== 2) {
+          throw new CompileError("peek(page, offset) takes exactly 2 arguments");
+        }
+        const page = this.compileSimpleOperand(expr.args[0], "a");
+        const offset = this.compileSimpleOperand(expr.args[1], "b");
+        if (page && offset) {
+          if (this.literalValue(expr.args[0]) === 0) {
+            return [...offset, "load ram[b] a"];
+          }
+          return [
+            ...offset,
+            ...page,
+            "set a rampage",
+            "load ram[b] d",
+            "opp 0",
+            "set a rampage",
+            "mov d a"
+          ];
+        }
+        return this.withScratch(2, ([pageAddress, offsetAddress]) => [
+          ...expr.args[0].accept(this),
+          `save a ram[${pageAddress}]`,
+          ...expr.args[1].accept(this),
+          `save a ram[${offsetAddress}]`,
+          `load ram[${offsetAddress}] b`,
+          `load ram[${pageAddress}] a`,
+          "set a rampage",
+          "load ram[b] d",
+          "opp 0",
+          "set a rampage",
+          "mov d a"
+        ]);
+      }
+      if (name === "poke") {
+        if (expr.args.length !== 3) {
+          throw new CompileError("poke(page, offset, value) takes exactly 3 arguments");
+        }
+        const page = this.compileSimpleOperand(expr.args[0], "a");
+        const offset = this.compileSimpleOperand(expr.args[1], "b");
+        const value = this.compileSimpleOperand(expr.args[2], "d");
+        if (page && offset && value) {
+          if (this.literalValue(expr.args[0]) === 0) {
+            const valueInA = this.compileSimpleOperand(expr.args[2], "a");
+            return [...offset, ...valueInA ?? [], "save b mar", "save a ram[current]"];
+          }
+          return [
+            ...offset,
+            ...value,
+            ...page,
+            "set a rampage",
+            "save b mar",
+            "save d ram[current]",
+            "opp 0",
+            "set a rampage",
+            "mov d a"
+          ];
+        }
+        return this.withScratch(3, ([pageAddress, offsetAddress, valueAddress]) => [
+          ...expr.args[0].accept(this),
+          `save a ram[${pageAddress}]`,
+          ...expr.args[1].accept(this),
+          `save a ram[${offsetAddress}]`,
+          ...expr.args[2].accept(this),
+          `save a ram[${valueAddress}]`,
+          `load ram[${offsetAddress}] b`,
+          `load ram[${valueAddress}] d`,
+          `load ram[${pageAddress}] a`,
+          "set a rampage",
+          "save b mar",
+          "save d ram[current]",
+          "opp 0",
+          "set a rampage",
+          `load ram[${valueAddress}] a`
+        ]);
+      }
+      if (name === "i2c8") {
+        if (expr.args.length !== 1) {
+          throw new CompileError("i2c8(value) takes exactly 1 argument");
+        }
+        const simpleValue = this.compileSimpleOperand(expr.args[0], "b");
+        const result = simpleValue ?? [...expr.args[0].accept(this), "mov a b"];
+        for (let bit = 7; bit >= 0; bit--) {
+          const zeroLabel = this.createLabel();
+          const endLabel = this.createLabel();
+          result.push(`load rom a ${1 << bit}`, "opp a&b", `jmp = ${zeroLabel}`);
+          result.push("out 0b01", "out 0b11", "out 0b01", `jmp ${endLabel}`);
+          result.push(`:${zeroLabel}`, "out 0b00", "out 0b10", "out 0b00", `:${endLabel}`);
+        }
+        result.push("out 0b01", "out 0b11", "out 0b01");
+        return result;
+      }
+      throw new CompileError(`Unknown function: ${name ?? "<expression>"}`);
     }
     visitExpressionStmt(stmt) {
       return stmt.expression.accept(this);
@@ -1404,7 +1590,7 @@ var jrb8Compiler = (() => {
       const result = stmt.condition.accept(this);
       const elseLabel = this.createLabel();
       const endLabel = this.createLabel();
-      result.push("cmp a 0", `jmp = ${elseLabel}`);
+      result.push("opp a", `jmp = ${elseLabel}`);
       result.push(...stmt.thenBranch.accept(this));
       result.push(`jmp ${endLabel}`);
       result.push(`:${elseLabel}`);
@@ -1421,7 +1607,7 @@ var jrb8Compiler = (() => {
       const result = [];
       result.push(`:${startLabel}`);
       if (condition) {
-        result.push(...condition.accept(this), "cmp a 0", `jmp = ${endLabel}`);
+        result.push(...condition.accept(this), "opp a", `jmp = ${endLabel}`);
       }
       result.push(...body.accept(this));
       if (increment) {
@@ -1451,6 +1637,9 @@ var jrb8Compiler = (() => {
     visitVarStmt(stmt) {
       const result = [];
       const varName = stmt.name;
+      if (this.nextVarAddress >= this.lowestScratchAddress) {
+        throw new CompileError("Program needs more than 256 variable and temporary RAM cells");
+      }
       const address = this.nextVarAddress++;
       this.variables.set(varName, address);
       if (stmt.initializer) {

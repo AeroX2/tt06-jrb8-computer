@@ -30,6 +30,7 @@ const MAR_SAVE = /[abcd] mar/;
 const COMPARE = /([abcd]) ([abcd]|0|1|-1|255)/;
 const JUMP = /(\.?(<=|<|=|>|>=) [abcd])|(.+)/;
 const OUT_PATTERN = /[abcd]|[0-9]+|ram\[[0-9]+\]|ram\[[abcd]\]/;
+const SET_RAMPAGE = /[abcd] rampage/;
 
 export class Assembler {
   private final: HexOrLabel[] = [];
@@ -65,6 +66,7 @@ export class Assembler {
     opp: () => true,
     load: (x: string) => this.checkLoad(x),
     save: (x: string) => this.checkSave(x),
+    set: (x: string) => x.match(SET_RAMPAGE) !== null,
     in: (x: string) => x.match(REGISTER) !== null,
     out: (x: string) => x.match(OUT_PATTERN) !== null,
     halt: (x: string) => x === "",

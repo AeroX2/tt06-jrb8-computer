@@ -1,0 +1,359 @@
+// SSD1306 demoscene in JRP: tumbling wireframe cube, moving starfield, and
+// "JRB8 - 8-BIT CPU" title. Flash ssd1306_demo_data.bin as the data image.
+// Requires writable RAM/PSRAM because both JRP variables and the framebuffer
+// are updated continuously.
+//
+// Data/RAM pages:
+//   0       JRP variables and compiler temporaries
+//   1       six 40-byte cube rotation tables
+//   2       y-to-page/bit tables, projected vertices, and cube edge table
+//   3..10   128x64 framebuffer
+//   11      star state
+//   12      star velocity table
+//   13      title bitmap
+
+var frame = 0
+var i = 0
+var j = 0
+var k = 0
+var b = 0
+var n = 0
+var v = 0
+var page = 0
+var col = 0
+var offset = 0
+var value = 0
+var temp = 0
+
+var vertex = 0
+var edge = 0
+var va = 0
+var vb = 0
+var x0 = 0
+var y0 = 0
+var x1 = 0
+var y1 = 0
+var dx = 0
+var dy = 0
+var sx = 0
+var sy = 0
+var err = 0
+var e2 = 0
+var negdy = 0
+var done = 0
+var move_x = 0
+var move_y = 0
+var x_sign = 0
+
+var star = 0
+var star_base = 0
+var velocity = 0
+var gidx = 0
+var xt = 0
+var yt = 0
+
+// ThingPulse-compatible initialization: one I2C transaction per command.
+i = 0
+while (i < 26) {
+  if (i == 0)  v = 0xAE
+  if (i == 1)  v = 0xD5
+  if (i == 2)  v = 0xF0
+  if (i == 3)  v = 0xA8
+  if (i == 4)  v = 0x3F
+  if (i == 5)  v = 0xD3
+  if (i == 6)  v = 0x00
+  if (i == 7)  v = 0x40
+  if (i == 8)  v = 0x8D
+  if (i == 9)  v = 0x14
+  if (i == 10) v = 0x20
+  if (i == 11) v = 0x00
+  if (i == 12) v = 0xA0
+  if (i == 13) v = 0xC0
+  if (i == 14) v = 0xDA
+  if (i == 15) v = 0x12
+  if (i == 16) v = 0x81
+  if (i == 17) v = 0xCF
+  if (i == 18) v = 0xD9
+  if (i == 19) v = 0xF1
+  if (i == 20) v = 0xDB
+  if (i == 21) v = 0x40
+  if (i == 22) v = 0xA4
+  if (i == 23) v = 0xA6
+  if (i == 24) v = 0x2E
+  if (i == 25) v = 0xAF
+
+  out 0b11
+  out 0b10
+  out 0b00
+  j = 0
+  while (j < 3) {
+    if (j == 0) b = 0x78
+    if (j == 1) b = 0x80
+    if (j == 2) b = v
+    i2c8(b)
+    j = j + 1
+  }
+  out 0b00
+  out 0b10
+  out 0b11
+  i = i + 1
+}
+
+// Seed 26 stars at the screen center and assign velocities from the table.
+star = 0
+while (star < 26) {
+  star_base = star + star
+  star_base = star_base + star_base
+  poke(11, star_base, 64)
+  offset = star_base + 1
+  poke(11, offset, 32)
+
+  velocity = star
+  if (velocity >= 24) velocity = velocity - 24
+  velocity = velocity + velocity
+  value = peek(12, velocity)
+  offset = star_base + 2
+  poke(11, offset, value)
+  velocity = velocity + 1
+  value = peek(12, velocity)
+  offset = star_base + 3
+  poke(11, offset, value)
+  star = star + 1
+}
+
+while (1) {
+  // Clear all eight framebuffer pages.
+  page = 3
+  while (page < 11) {
+    col = 0
+    while (col < 128) {
+      poke(page, col, 0)
+      col = col + 1
+    }
+    page = page + 1
+  }
+
+  // Load the six matrix coefficients for this frame into page-2 scratch.
+  k = 0
+  offset = frame
+  while (k < 6) {
+    value = peek(1, offset)
+    col = 144 + k
+    poke(2, col, value)
+    offset = offset + 40
+    k = k + 1
+  }
+
+  // Project all eight vertices. Vertex bits select the +/- matrix terms.
+  vertex = 0
+  while (vertex < 8) {
+    // The vertex list walks each square in Gray-code order: X is bit0 XOR
+    // bit1, Y is bit1, and Z is bit2.
+    x_sign = vertex & 1
+    if (vertex & 2) x_sign = !x_sign
+    value = 0
+    temp = peek(2, 144)
+    if (x_sign) value = value + temp
+    else value = value - temp
+    temp = peek(2, 145)
+    if (vertex & 2) value = value + temp
+    else value = value - temp
+    temp = peek(2, 146)
+    if (vertex & 4) value = value + temp
+    else value = value - temp
+    value = value + 64
+    offset = vertex + vertex
+    offset = offset + 128
+    poke(2, offset, value)
+
+    value = 0
+    temp = peek(2, 147)
+    if (x_sign) value = value + temp
+    else value = value - temp
+    temp = peek(2, 148)
+    if (vertex & 2) value = value + temp
+    else value = value - temp
+    temp = peek(2, 149)
+    if (vertex & 4) value = value + temp
+    else value = value - temp
+    value = value + 32
+    offset = offset + 1
+    poke(2, offset, value)
+    vertex = vertex + 1
+  }
+
+  // Fetch each edge and draw it with integer Bresenham rasterization.
+  edge = 0
+  while (edge < 12) {
+    offset = edge + edge
+    offset = offset + 151
+    va = peek(2, offset)
+    offset = offset + 1
+    vb = peek(2, offset)
+
+    offset = va + va
+    offset = offset + 128
+    x0 = peek(2, offset)
+    offset = offset + 1
+    y0 = peek(2, offset)
+    offset = vb + vb
+    offset = offset + 128
+    x1 = peek(2, offset)
+    offset = offset + 1
+    y1 = peek(2, offset)
+
+    if (x0 < x1) {
+      dx = x1 - x0
+      sx = 1
+    } else {
+      dx = x0 - x1
+      sx = 255
+    }
+    if (y0 < y1) {
+      dy = y1 - y0
+      sy = 1
+    } else {
+      dy = y0 - y1
+      sy = 255
+    }
+    err = dx - dy
+    negdy = -dy
+    done = 0
+    while (done == 0) {
+      page = peek(2, y0)
+      offset = 64 + y0
+      value = peek(2, offset)
+      temp = peek(page, x0)
+      temp = temp | value
+      poke(page, x0, temp)
+
+      if ((x0 == x1) && (y0 == y1)) {
+        done = 1
+      } else {
+        e2 = err + err
+
+        // Signed e2 > signed -dy, expressed with unsigned 8-bit tests.
+        move_x = 0
+        if (e2 < 128) {
+          if (negdy >= 128) move_x = 1
+          else if (e2 > negdy) move_x = 1
+        } else {
+          if ((negdy >= 128) && (e2 > negdy)) move_x = 1
+        }
+        if (move_x) {
+          err = err - dy
+          x0 = x0 + sx
+        }
+
+        // dx is non-negative, so every negative e2 is less than it.
+        move_y = 0
+        if (e2 >= 128) move_y = 1
+        else if (e2 < dx) move_y = 1
+        if (move_y) {
+          err = err + dx
+          y0 = y0 + sy
+        }
+      }
+    }
+    edge = edge + 1
+  }
+
+  // Advance, respawn, and draw the starfield behind the title.
+  star = 0
+  while (star < 26) {
+    star_base = star + star
+    star_base = star_base + star_base
+    xt = peek(11, star_base)
+    offset = star_base + 2
+    value = peek(11, offset)
+    xt = xt + value
+    offset = star_base + 1
+    yt = peek(11, offset)
+    offset = star_base + 3
+    value = peek(11, offset)
+    yt = yt + value
+
+    if ((xt >= 128) || (yt >= 64)) {
+      xt = 64
+      yt = 32
+      velocity = gidx + gidx
+      value = peek(12, velocity)
+      offset = star_base + 2
+      poke(11, offset, value)
+      velocity = velocity + 1
+      value = peek(12, velocity)
+      offset = star_base + 3
+      poke(11, offset, value)
+      gidx = gidx + 1
+      if (gidx == 24) gidx = 0
+    }
+
+    poke(11, star_base, xt)
+    offset = star_base + 1
+    poke(11, offset, yt)
+    page = peek(2, yt)
+    offset = 64 + yt
+    value = peek(2, offset)
+    temp = peek(page, xt)
+    temp = temp | value
+    poke(page, xt, temp)
+    star = star + 1
+  }
+
+  // Overlay nonblank title columns on the bottom display page.
+  col = 0
+  while (col < 128) {
+    value = peek(13, col)
+    if (value > 0) poke(10, col, value)
+    col = col + 1
+  }
+
+  // Set the full-screen SSD1306 addressing window.
+  out 0b11
+  out 0b10
+  out 0b00
+  j = 0
+  while (j < 8) {
+    if (j == 0) b = 0x78
+    if (j == 1) b = 0x00
+    if (j == 2) b = 0x21
+    if (j == 3) b = 0
+    if (j == 4) b = 127
+    if (j == 5) b = 0x22
+    if (j == 6) b = 0
+    if (j == 7) b = 7
+    i2c8(b)
+    j = j + 1
+  }
+  out 0b00
+  out 0b10
+  out 0b11
+
+  // Stream the complete framebuffer in one data transaction.
+  out 0b11
+  out 0b10
+  out 0b00
+  j = 0
+  while (j < 2) {
+    if (j == 0) b = 0x78
+    if (j == 1) b = 0x40
+    i2c8(b)
+    j = j + 1
+  }
+  page = 3
+  while (page < 11) {
+    col = 0
+    while (col < 128) {
+      b = peek(page, col)
+      i2c8(b)
+      col = col + 1
+    }
+    page = page + 1
+  }
+  out 0b00
+  out 0b10
+  out 0b11
+
+  frame = frame + 1
+  if (frame == 40) frame = 0
+}
